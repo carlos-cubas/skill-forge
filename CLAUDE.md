@@ -1,0 +1,199 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+SkillForge is a Python toolkit that enables CrewAI and LangChain agents to be equipped with domain-specific skills using Anthropic's proven skill format. It provides:
+
+1. **CLI** - Marketplace management and skill installation (`skillforge` command)
+2. **Runtime Library** - Loading skills into CrewAI/LangChain agents
+3. **Framework Adapters** - Drop-in replacements for Agent classes that inject skills
+
+**Key Philosophy**: SkillForge is tooling, not a skill repository. Skills live in marketplaces (GitHub repos) or user projects. SkillForge manages discovery, installation, and runtime injection.
+
+## Architecture
+
+### Core Components
+
+1. **Skill Loader** (`core/loader.py`) - Discovers and loads skills from configured directories, parses SKILL.md files
+2. **Tool Registry** (`core/registry.py`) - Manages shared tools and skill-bundled tools
+3. **Framework Adapters** (`adapters/crewai.py`, `adapters/langchain.py`) - Inject skills into framework-native constructs
+4. **Meta-Skill** (`meta/using-skillforge/SKILL.md`) - Teaches agents how to discover and use skills (auto-injected into prompts)
+
+### Skill Discovery Strategy
+
+Uses hybrid approach:
+1. **Installed skills** → Tracked in `.skillforge/manifest.json` (via `skillforge install`)
+2. **Local skills** → Discovered via glob patterns in `.skillforge.yaml`
+
+Lookup order: manifest first, then skill_paths, then error.
+
+### Skill Format (Anthropic Standard)
+
+Skills are directories containing:
+- `SKILL.md` (required) - Instructions + frontmatter metadata (name, description, allowed-tools)
+- `tools.py` (optional) - Skill-specific tools
+- `resources/`, `scripts/` (optional) - Supporting files
+
+## Critical Design Decisions
+
+**DO NOT** change these without understanding the rationale (see design doc):
+
+1. **Skill format** = Anthropic's SKILL.md format (ecosystem compatibility)
+2. **CLI model** = Mirrors Claude Code's `/plugin` command (familiar UX)
+3. **Directory structure** = User's choice (flexibility via `.skillforge.yaml`)
+4. **Meta-skill approach** = Progressive loading via `skillforge read` command (not full content injection by default)
+5. **Tool handling** = Hybrid (skills can bundle tools OR reference shared tools)
+
+## Development Setup
+
+### Project Structure (Planned)
+
+```
+skill-forge/
+├── src/skillforge/
+│   ├── cli/           # CLI commands (marketplace, install, read)
+│   ├── core/          # Skill, loader, registry, marketplace
+│   ├── adapters/      # CrewAI and LangChain integration
+│   ├── meta/          # Default using-skillforge meta-skill
+│   └── utils/         # SKILL.md parsing
+├── tests/
+├── docs/plans/        # Design documents
+└── pyproject.toml
+```
+
+### Commands (Once Implemented)
+
+**Testing**:
+- `pytest tests/` - Run all tests
+- `pytest tests/test_loader.py -v` - Run specific test file
+- `pytest -k test_skill_discovery` - Run tests matching pattern
+
+**Development**:
+- `pip install -e .` - Install in editable mode
+- `skillforge --help` - Verify CLI works
+
+**CLI Commands** (for testing agent integration):
+- `skillforge marketplace add <source>` - Add marketplace
+- `skillforge install <skill>@<marketplace> --to <path>` - Install skill
+- `skillforge read <skill-name> --from <path>` - Load skill content (used by agents at runtime)
+
+## Integration Patterns
+
+### CrewAI Pattern
+```python
+from skillforge.crewai import Agent  # Drop-in replacement
+
+agent = Agent(
+    role="Executive Coach",
+    skills=["rapid-interviewing", "goal-extraction"]  # Just names, no paths
+)
+```
+
+### LangChain Pattern
+```python
+from skillforge.langchain import create_agent  # Drop-in replacement
+
+agent = create_agent(
+    model="gpt-4o",
+    skills=["rapid-interviewing"]  # Just names, no paths
+)
+```
+
+### Library Usage (Framework-agnostic)
+```python
+from skillforge import SkillForge
+
+sf = SkillForge()  # Auto-loads from .skillforge.yaml + manifest
+skill = sf.get_skill("rapid-interviewing")
+print(skill.instructions)  # Markdown content
+```
+
+## Key Implementation Notes
+
+### Meta-Skill Auto-Injection
+
+The `using-skillforge` meta-skill is **auto-injected** into agent system prompts. It teaches agents:
+1. That skills exist and when to check for them
+2. How to load skills: `Bash("skillforge read <skill-name> --from <path>")`
+3. To announce skill usage: "I'm using the [skill] skill for [purpose]"
+
+**Critical**: Agents must be able to execute Bash commands during runtime. This assumption MUST be validated before full implementation.
+
+### Configuration File (.skillforge.yaml)
+
+Lives in project root, specifies skill discovery paths:
+
+```yaml
+skill_paths:
+  - ./agents/**/skills/*  # Glob: all skills under any agent
+  - ./shared-skills/*     # Shared skills
+```
+
+### Manifest File (.skillforge/manifest.json)
+
+Auto-generated by `skillforge install`, tracks installed skills:
+
+```json
+{
+  "skills": {
+    "rapid-interviewing": {
+      "path": "./agents/coach/skills/rapid-interviewing",
+      "marketplace": "dearmarkus",
+      "version": "1.0.0"
+    }
+  }
+}
+```
+
+## Assumptions to Validate
+
+Before implementing core functionality, these assumptions MUST be empirically validated:
+
+### CrewAI Assumptions
+- Agents can call Bash commands during execution
+- Backstory content is included in LLM prompt
+- Agent can read Bash output and act on it
+- Prompt injection doesn't break agent behavior
+
+### LangChain Assumptions
+- Agents can call shell commands via tool
+- System prompt can be extended at runtime
+- Tool output is returned to agent context
+
+### General Assumptions
+- `skillforge read` CLI is fast enough for runtime usage
+- Skill content fits in context window
+- Agents follow meta-skill instructions reliably
+
+**Validation Method**: Create minimal test fixtures for both frameworks, test each assumption independently, document findings.
+
+## First Use Case
+
+DearMarkus.ai Event Experience - Three agents with specialized skills:
+- **Executive Coach**: rapid-interviewing, goal-extraction, profiling
+- **Event Concierge**: networking-matching, session-recommendation, event-data-query
+- **Executive Assistant**: calendar-integration, contextual-nudging, personal-context
+
+## Important References
+
+- [Anthropic: Equipping Agents with Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) - Official skill format spec
+- [OpenSkills](https://github.com/numman-ali/openskills) - Reference implementation for coding agents
+- Design Document: `docs/plans/2025-12-04-skillforge-design.md` - Complete architecture and rationale
+
+## Implementation Phases
+
+1. **Phase 0**: Validate assumptions (CrewAI/LangChain behavior)
+2. **Phase 1**: Core implementation (Skill class, parser, CLI `read` command)
+3. **Phase 2**: Framework adapters (drop-in Agent classes)
+4. **Phase 3**: Marketplace support (CLI for install/manage)
+5. **Phase 4**: Production use case (DearMarkus.ai event-skills)
+
+## Notes for Future Claude Instances
+
+- **Read the design doc first** (`docs/plans/2025-12-04-skillforge-design.md`) - Contains full context and rationale
+- **Don't implement before validation** - Phase 0 assumptions MUST be validated empirically
+- **Respect user directory structure** - SkillForge doesn't impose structure, only discovers via globs
+- **Progressive loading is key** - Meta-skill + `skillforge read` command, not full content injection
+- **Test with real LLMs** - Meta-skill instructions need empirical validation with actual agent behavior
