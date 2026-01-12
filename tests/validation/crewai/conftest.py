@@ -136,3 +136,12 @@ def pytest_configure(config):
         "markers",
         "crewai_assumption: mark test as validating a specific CrewAI assumption"
     )
+
+
+def pytest_runtest_setup(item):
+    """Skip tests marked requires_api_key when no API key is present."""
+    for marker in item.iter_markers(name="requires_api_key"):
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        if not (anthropic_key or openai_key):
+            pytest.skip("No API key available (set ANTHROPIC_API_KEY or OPENAI_API_KEY)")
