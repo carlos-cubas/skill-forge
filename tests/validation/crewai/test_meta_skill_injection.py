@@ -236,7 +236,7 @@ When you analyze any data, you MUST announce using this skill per the protocol a
             "SKILL_ANNOUNCEMENT" in result_str or
             "Using data-analysis" in result_str or
             "using the data-analysis skill" in result_str.lower() or
-            "I'm using" in result_str and "skill" in result_str.lower()
+            ("I'm using" in result_str and "skill" in result_str.lower())
         )
 
         # Also verify the agent actually did the analysis (average is 30)
@@ -304,9 +304,9 @@ Instead, when you would load a skill, describe what skill you would load and why
         # Agent should recognize this calls for the interviewing skill
         recognizes_skill_need = (
             "rapid-interviewing" in result_str or
-            "interview" in result_str and "skill" in result_str or
+            ("interview" in result_str and "skill" in result_str) or
             "skillforge" in result_str or
-            "load" in result_str and "skill" in result_str
+            ("load" in result_str and "skill" in result_str)
         )
 
         assert recognizes_skill_need, (
