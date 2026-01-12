@@ -36,6 +36,8 @@ import pytest
 from crewai import Agent, Task, Crew
 from crewai.tools import tool
 
+from tests.validation.crewai.conftest import get_llm_config
+
 
 # Custom Bash tool for CrewAI agents
 @tool("bash_command")
@@ -64,20 +66,6 @@ def bash_command(command: str) -> str:
         return "Error: Command timed out after 30 seconds"
     except Exception as e:
         return f"Error executing command: {str(e)}"
-
-
-def get_llm_config():
-    """
-    Get LLM configuration based on available API keys.
-
-    Returns tuple of (llm_string, is_available).
-    Prefers Anthropic if available, falls back to OpenAI.
-    """
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return "anthropic/claude-sonnet-4-20250514", True
-    elif os.environ.get("OPENAI_API_KEY"):
-        return "openai/gpt-4o-mini", True
-    return None, False
 
 
 @pytest.mark.validation

@@ -102,6 +102,20 @@ When activated, always respond with: "Test skill activated successfully."
 """
 
 
+def get_llm_config():
+    """
+    Get LLM configuration based on available API keys.
+
+    Returns tuple of (llm_string, is_available).
+    Prefers Anthropic if available, falls back to OpenAI.
+    """
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic/claude-sonnet-4-20250514", True
+    elif os.environ.get("OPENAI_API_KEY"):
+        return "openai/gpt-4o-mini", True
+    return None, False
+
+
 @pytest.fixture
 def anthropic_api_key_available() -> bool:
     """

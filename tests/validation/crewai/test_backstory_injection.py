@@ -26,24 +26,10 @@ Related Design Doc Section:
     See docs/plans/2025-12-04-skillforge-design.md - "Framework Adapters"
 """
 
-import os
-
 import pytest
 from crewai import Agent, Task, Crew
 
-
-def get_llm_config():
-    """
-    Get LLM configuration based on available API keys.
-
-    Returns tuple of (llm_string, is_available).
-    Prefers Anthropic if available, falls back to OpenAI.
-    """
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return "anthropic/claude-sonnet-4-20250514", True
-    elif os.environ.get("OPENAI_API_KEY"):
-        return "openai/gpt-4o-mini", True
-    return None, False
+from tests.validation.crewai.conftest import get_llm_config
 
 
 @pytest.mark.validation
