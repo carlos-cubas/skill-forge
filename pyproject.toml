@@ -53,6 +53,8 @@ markers = [
     "integration: marks tests as integration tests (may require API keys)",
     "slow: marks tests as slow running",
     "validation: marks tests as assumption validation tests",
+    "crewai_assumption: marks tests as validating a specific CrewAI assumption",
+    "requires_api_key: marks tests as requiring an API key",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
