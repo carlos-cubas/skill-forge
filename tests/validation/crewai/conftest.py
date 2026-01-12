@@ -6,11 +6,42 @@ that are critical to SkillForge's design.
 """
 
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Generator
 
 import pytest
+from crewai.tools import tool
+
+
+# Custom Bash tool for CrewAI agents - shared across validation tests
+@tool("bash_command")
+def bash_command(command: str) -> str:
+    """
+    Execute a bash command and return its output.
+
+    Args:
+        command: The bash command to execute.
+
+    Returns:
+        The stdout output of the command, or error message if the command fails.
+    """
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode != 0:
+            return f"Error (exit code {result.returncode}): {result.stderr}"
+        return result.stdout.strip() if result.stdout else "Command completed successfully (no output)"
+    except subprocess.TimeoutExpired:
+        return "Error: Command timed out after 30 seconds"
+    except Exception as e:
+        return f"Error executing command: {str(e)}"
 
 
 # Path to the fixtures directory

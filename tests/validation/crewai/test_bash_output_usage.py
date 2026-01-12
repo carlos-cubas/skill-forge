@@ -30,44 +30,13 @@ Related Design Doc Section:
     See docs/plans/2025-12-04-skillforge-design.md - "Progressive Loading"
 """
 
-import subprocess
 import tempfile
 from pathlib import Path
 
 import pytest
 from crewai import Agent, Task, Crew
-from crewai.tools import tool
 
-from tests.validation.crewai.conftest import get_llm_config
-
-
-# Custom Bash tool for CrewAI agents
-@tool("bash_command")
-def bash_command(command: str) -> str:
-    """
-    Execute a bash command and return its output.
-
-    Args:
-        command: The bash command to execute.
-
-    Returns:
-        The stdout output of the command, or error message if the command fails.
-    """
-    try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        if result.returncode != 0:
-            return f"Error (exit code {result.returncode}): {result.stderr}"
-        return result.stdout.strip() if result.stdout else "Command completed successfully (no output)"
-    except subprocess.TimeoutExpired:
-        return "Error: Command timed out after 30 seconds"
-    except Exception as e:
-        return f"Error executing command: {str(e)}"
+from tests.validation.crewai.conftest import get_llm_config, bash_command
 
 
 @pytest.mark.validation
@@ -140,7 +109,7 @@ PRIORITY: high"""
             result_str = str(result).upper()
 
             # Verify agent extracted and reported the specific values
-            has_code = "ALPHA-7734-DELTA" in result_str or "ALPHA" in result_str and "7734" in result_str
+            has_code = "ALPHA-7734-DELTA" in result_str or ("ALPHA" in result_str and "7734" in result_str)
             has_priority = "HIGH" in result_str
 
             assert has_code, (
