@@ -16,7 +16,6 @@ import pytest
 # LangChain imports - these may not be installed in all environments
 try:
     from langchain_core.tools import tool as langchain_tool
-    from langchain_core.messages import SystemMessage, HumanMessage
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
@@ -118,15 +117,14 @@ def test_skill_path() -> Path:
 
 
 @pytest.fixture
-def test_skill_content() -> str:
+def test_skill_content(test_skill_path) -> str:
     """
     Returns the content of the test-skill.md fixture file.
 
     Useful for tests that need to inject skill content directly
     into agent prompts or system messages.
     """
-    skill_path = FIXTURES_DIR / "test-skill.md"
-    return skill_path.read_text()
+    return test_skill_path.read_text()
 
 
 @pytest.fixture
@@ -222,17 +220,3 @@ def langchain_llm():
     if llm is None:
         pytest.skip("No LLM API key available or LangChain not installed")
     return llm
-
-
-def pytest_configure(config):
-    """
-    Configure custom pytest markers for LangChain validation tests.
-    """
-    config.addinivalue_line(
-        "markers",
-        "requires_api_key: mark test as requiring an API key (skip if not available)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "langchain_assumption: mark test as validating a specific LangChain assumption"
-    )
