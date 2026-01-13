@@ -36,7 +36,6 @@ from typing import List, Optional
 import pytest
 
 from tests.validation.langchain.conftest import (
-    get_langchain_llm,
     shell_command,
     LANGCHAIN_AGENTS_AVAILABLE,
     create_agent_executor,
@@ -205,13 +204,14 @@ class TestCustomParameters:
             pytest.skip("Shell command tool not available")
 
         # Create agent with both base and custom parameters
-        base_system_prompt = "You are a PRECISE_BASE_AGENT_MARKER assistant."
+        # Use unique markers that would never appear in a generic LLM response
+        base_system_prompt = "You are a PRECISE_BASE_XK47 assistant."
 
         executor = create_skillforge_agent(
             llm=langchain_llm,  # Base param
             tools=[shell_command],  # Base param
             system_prompt=base_system_prompt,  # Base param
-            skills=["CUSTOM_SKILL_MARKER"],  # Custom param
+            skills=["CUSTOM_SKILL_MN92"],  # Custom param
         )
 
         result = executor.invoke({
@@ -225,17 +225,14 @@ class TestCustomParameters:
 
         # Both base and custom content should be present in agent's understanding
         # (The base prompt and skills are both injected)
-        has_any_marker = (
-            "PRECISE" in result_str or
-            "BASE" in result_str or
-            "AGENT" in result_str or
-            "MARKER" in result_str or
-            "CUSTOM" in result_str or
-            "SKILL" in result_str
+        # Check for unique markers that wouldn't appear in generic responses
+        has_unique_marker = (
+            "XK47" in result_str or
+            "MN92" in result_str
         )
 
-        assert has_any_marker, (
-            f"Agent should reference markers from its system prompt. "
+        assert has_unique_marker, (
+            f"Agent should reference unique markers (XK47 or MN92) from its system prompt. "
             f"Got: {result.get('output', '')}"
         )
 
