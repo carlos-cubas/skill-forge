@@ -32,15 +32,17 @@ from pathlib import Path
 
 import pytest
 
-# LangChain imports - wrapped in try/except for environments without LangChain
-try:
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain.agents import create_tool_calling_agent, AgentExecutor
-    LANGCHAIN_AVAILABLE = True
-except ImportError:
-    LANGCHAIN_AVAILABLE = False
+from tests.validation.langchain.conftest import get_langchain_llm, shell_command, LANGCHAIN_AVAILABLE
 
-from tests.validation.langchain.conftest import get_langchain_llm, shell_command
+# LangChain agent imports - may not be available in all LangChain versions
+LANGCHAIN_AGENTS_AVAILABLE = False
+if LANGCHAIN_AVAILABLE:
+    try:
+        from langchain_core.prompts import ChatPromptTemplate
+        from langchain.agents import create_tool_calling_agent, AgentExecutor
+        LANGCHAIN_AGENTS_AVAILABLE = True
+    except ImportError:
+        pass
 
 
 def create_agent_executor(llm, tools, system_prompt: str):
@@ -83,8 +85,8 @@ class TestShellExecution:
         Expected: Agent runs `echo 'hello world'` and receives "hello world" as output.
         This validates the basic mechanism that SkillForge will use to load skills.
         """
-        if not LANGCHAIN_AVAILABLE:
-            pytest.skip("LangChain not installed")
+        if not LANGCHAIN_AGENTS_AVAILABLE:
+            pytest.skip("LangChain agents not available")
 
         if shell_command is None:
             pytest.skip("Shell command tool not available")
@@ -118,7 +120,7 @@ class TestShellExecution:
         This simulates `skillforge read` which outputs skill content to stdout.
         The agent must receive and act on the command output.
         """
-        if not LANGCHAIN_AVAILABLE:
+        if not LANGCHAIN_AGENTS_AVAILABLE:
             pytest.skip("LangChain not installed")
 
         if shell_command is None:
@@ -162,7 +164,7 @@ class TestShellExecution:
         Expected: Agent receives error message and can report/handle it.
         This is important for robustness when `skillforge read` fails.
         """
-        if not LANGCHAIN_AVAILABLE:
+        if not LANGCHAIN_AGENTS_AVAILABLE:
             pytest.skip("LangChain not installed")
 
         if shell_command is None:
@@ -199,7 +201,7 @@ class TestShellExecution:
         This validates that agents can use the shell tool repeatedly,
         which may be needed if loading multiple skills during a session.
         """
-        if not LANGCHAIN_AVAILABLE:
+        if not LANGCHAIN_AGENTS_AVAILABLE:
             pytest.skip("LangChain not installed")
 
         if shell_command is None:
