@@ -21,6 +21,16 @@ except ImportError:
     LANGCHAIN_AVAILABLE = False
     langchain_tool = None
 
+# LangChain agent imports - may not be available in all LangChain versions
+LANGCHAIN_AGENTS_AVAILABLE = False
+if LANGCHAIN_AVAILABLE:
+    try:
+        from langchain_core.prompts import ChatPromptTemplate
+        from langchain.agents import create_tool_calling_agent, AgentExecutor
+        LANGCHAIN_AGENTS_AVAILABLE = True
+    except ImportError:
+        pass
+
 
 # Path to the shared fixtures directory
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -101,6 +111,40 @@ if LANGCHAIN_AVAILABLE and langchain_tool is not None:
             return f"Error executing command: {str(e)}"
 else:
     shell_command = None
+
+
+def create_agent_executor(llm, tools, system_prompt: str):
+    """
+    Create a LangChain agent executor with the given LLM and tools.
+
+    This is a shared helper for LangChain validation tests.
+
+    Args:
+        llm: The LangChain LLM instance
+        tools: List of tools the agent can use
+        system_prompt: The system prompt describing the agent's role
+
+    Returns:
+        AgentExecutor instance ready to invoke
+
+    Note:
+        This function requires LANGCHAIN_AGENTS_AVAILABLE to be True.
+        Callers should check this before calling.
+    """
+    if not LANGCHAIN_AGENTS_AVAILABLE:
+        raise RuntimeError(
+            "LangChain agents not available. "
+            "Check LANGCHAIN_AGENTS_AVAILABLE before calling create_agent_executor."
+        )
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
+
+    agent = create_tool_calling_agent(llm, tools, prompt)
+    return AgentExecutor(agent=agent, tools=tools, verbose=False)
 
 
 @pytest.fixture

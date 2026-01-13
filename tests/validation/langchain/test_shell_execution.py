@@ -32,39 +32,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.validation.langchain.conftest import get_langchain_llm, shell_command, LANGCHAIN_AVAILABLE
-
-# LangChain agent imports - may not be available in all LangChain versions
-LANGCHAIN_AGENTS_AVAILABLE = False
-if LANGCHAIN_AVAILABLE:
-    try:
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain.agents import create_tool_calling_agent, AgentExecutor
-        LANGCHAIN_AGENTS_AVAILABLE = True
-    except ImportError:
-        pass
-
-
-def create_agent_executor(llm, tools, system_prompt: str):
-    """
-    Create a LangChain agent executor with the given LLM and tools.
-
-    Args:
-        llm: The LangChain LLM instance
-        tools: List of tools the agent can use
-        system_prompt: The system prompt describing the agent's role
-
-    Returns:
-        AgentExecutor instance ready to invoke
-    """
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
-
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=False)
+from tests.validation.langchain.conftest import (
+    get_langchain_llm,
+    shell_command,
+    LANGCHAIN_AGENTS_AVAILABLE,
+    create_agent_executor,
+)
 
 
 @pytest.mark.validation
