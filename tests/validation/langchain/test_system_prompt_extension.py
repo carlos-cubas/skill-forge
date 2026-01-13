@@ -38,7 +38,6 @@ LANGCHAIN_MESSAGES_AVAILABLE = False
 if LANGCHAIN_AVAILABLE:
     try:
         from langchain_core.messages import SystemMessage, HumanMessage
-        from langchain_core.prompts import ChatPromptTemplate
         LANGCHAIN_MESSAGES_AVAILABLE = True
     except ImportError:
         pass
@@ -295,12 +294,14 @@ class TestSystemPromptExtension:
         has_answer = "4" in response or "four" in response_lower
 
         assert has_answer, (
-            f"Agent should still answer the question. Got: {response}"
+            f"Agent should still answer the question. "
+            f"Skill indicator detected: {has_skill_indicator}. Got: {response}"
         )
 
-        # This is a soft check - we verify the agent at least received the skill
-        # and attempted to follow it. The exact behavior depends on skill content.
-        # We primarily validate that injecting content doesn't break the agent.
+        # Note: has_skill_indicator is a soft check included in the assertion message above.
+        # We verify the agent received the skill and attempted to follow it.
+        # The exact behavior depends on skill content. The primary validation is
+        # that injecting content doesn't break the agent's ability to answer.
 
     def test_multiple_extensions_combine_correctly(self, langchain_llm):
         """
