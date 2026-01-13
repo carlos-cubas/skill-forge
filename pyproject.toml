@@ -56,6 +56,8 @@ markers = [
     "validation: marks tests as assumption validation tests",
     "crewai_assumption: marks tests as validating a specific CrewAI assumption",
     "langchain_assumption: marks tests as validating a specific LangChain assumption",
+    "general_assumption: marks tests as validating general SkillForge assumptions",
+    "benchmark: marks tests as performance benchmark tests",
     "requires_api_key: marks tests as requiring an API key",
 ]
 filterwarnings = [
