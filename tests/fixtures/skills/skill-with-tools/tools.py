@@ -33,3 +33,7 @@ def generate_chart(data: dict, chart_type: str = "bar") -> str:
     """
     # Placeholder implementation for testing
     return f"/tmp/chart_{chart_type}.png"
+
+
+# Export for ToolRegistry - convention for skill-bundled tools
+TOOLS = [analyze_csv, generate_chart]

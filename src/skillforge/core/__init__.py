@@ -8,6 +8,7 @@ from skillforge.core.meta_skill import (
     format_skills_list,
     get_meta_skill_content,
 )
+from skillforge.core.registry import ToolRegistry
 
 __all__ = [
     "SkillForgeConfig",
@@ -19,4 +20,5 @@ __all__ = [
     "render_meta_skill",
     "format_skills_list",
     "get_meta_skill_content",
+    "ToolRegistry",
 ]
