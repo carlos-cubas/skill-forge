@@ -23,10 +23,10 @@ except ImportError:
 
 # LangChain agent imports - may not be available in all LangChain versions
 LANGCHAIN_AGENTS_AVAILABLE = False
+create_agent = None
 if LANGCHAIN_AVAILABLE:
     try:
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain.agents import create_tool_calling_agent, AgentExecutor
+        from langchain.agents import create_agent
         LANGCHAIN_AGENTS_AVAILABLE = True
     except ImportError:
         pass
@@ -113,11 +113,59 @@ else:
     shell_command = None
 
 
+class AgentWrapper:
+    """
+    Wrapper that provides a compatible interface for LangChain 1.2.x agents.
+
+    This wrapper allows tests to use the same invocation pattern as the old API:
+    - executor.invoke({"input": "..."}) returns {"output": "..."}
+
+    The new LangChain 1.2.x API uses:
+    - agent.invoke({"messages": [("user", "...")]}) returns response with messages
+    """
+
+    def __init__(self, agent):
+        self._agent = agent
+
+    def invoke(self, input_dict):
+        """
+        Invoke the agent with the old-style input format.
+
+        Args:
+            input_dict: Dict with "input" key containing the user message
+
+        Returns:
+            Dict with "output" key containing the agent's final response
+        """
+        user_input = input_dict.get("input", "")
+        result = self._agent.invoke({"messages": [("user", user_input)]})
+
+        # Extract the final response from the new API format
+        # The result contains a "messages" list; we want the last AI message content
+        if hasattr(result, "get"):
+            messages = result.get("messages", [])
+            if messages:
+                last_message = messages[-1]
+                # Handle both message objects and tuples
+                if hasattr(last_message, "content"):
+                    return {"output": last_message.content}
+                elif isinstance(last_message, tuple) and len(last_message) >= 2:
+                    return {"output": last_message[1]}
+            # Fallback: try to get output directly
+            if "output" in result:
+                return {"output": result["output"]}
+        # If result is a string or has content attribute
+        if hasattr(result, "content"):
+            return {"output": result.content}
+        return {"output": str(result)}
+
+
 def create_agent_executor(llm, tools, system_prompt: str):
     """
-    Create a LangChain agent executor with the given LLM and tools.
+    Create a LangChain agent with the given LLM and tools.
 
     This is a shared helper for LangChain validation tests.
+    Updated for LangChain 1.2.x API.
 
     Args:
         llm: The LangChain LLM instance
@@ -125,7 +173,7 @@ def create_agent_executor(llm, tools, system_prompt: str):
         system_prompt: The system prompt describing the agent's role
 
     Returns:
-        AgentExecutor instance ready to invoke
+        AgentWrapper instance ready to invoke with {"input": "..."} format
 
     Note:
         This function requires LANGCHAIN_AGENTS_AVAILABLE to be True.
@@ -137,14 +185,12 @@ def create_agent_executor(llm, tools, system_prompt: str):
             "Check LANGCHAIN_AGENTS_AVAILABLE before calling create_agent_executor."
         )
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
-
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=False)
+    agent = create_agent(
+        model=llm,
+        tools=tools,
+        system_prompt=system_prompt
+    )
+    return AgentWrapper(agent)
 
 
 @pytest.fixture
