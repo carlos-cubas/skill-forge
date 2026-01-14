@@ -1,6 +1,6 @@
 """SkillForge framework adapters for CrewAI and LangChain."""
 
-# CrewAI adapter is imported lazily to avoid requiring crewai
+# Adapters are imported lazily to avoid requiring frameworks
 # when using other parts of SkillForge
 
-__all__ = ["crewai"]
+__all__ = ["crewai", "langchain"]
