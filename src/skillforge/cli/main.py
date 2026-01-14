@@ -5,11 +5,13 @@ This module provides the main CLI entry point for SkillForge commands:
 - skillforge version - Show version information
 - skillforge marketplace - Marketplace management (future)
 - skillforge install - Install skills from marketplaces (future)
-- skillforge read - Load skill content for agents (future)
+- skillforge read - Load skill content for agents
 """
 
 import typer
 from rich.console import Console
+
+from skillforge.cli.read import read_skill
 
 app = typer.Typer(
     name="skillforge",
@@ -18,6 +20,9 @@ app = typer.Typer(
 )
 
 console = Console()
+
+# Register the read command
+app.command(name="read")(read_skill)
 
 
 @app.command()
