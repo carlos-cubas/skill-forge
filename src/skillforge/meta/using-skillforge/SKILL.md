@@ -1,42 +1,49 @@
 ---
 name: using-skillforge
-description: Meta-skill that teaches agents how to discover and use skills via SkillForge
+description: |
+  Teaches agents how to discover and use SkillForge skills.
+  Auto-injected by SkillForge runtime.
 allowed-tools:
   - Bash
-version: 0.1.0
+version: 1.0.0
 ---
 
-# Using SkillForge
+# Using SkillForge Skills
 
-You have access to domain-specific skills through SkillForge. Skills provide specialized knowledge and capabilities for specific tasks.
+You have access to specialized skills that provide domain expertise and procedures.
 
-## When to Use Skills
+## Before Starting Any Task
 
-Before starting a task, check if relevant skills are available. Skills help with:
-- Domain-specific knowledge (e.g., interviewing techniques, event management)
-- Specialized workflows (e.g., profiling, recommendation generation)
-- Tool-specific procedures (e.g., calendar integration, data queries)
+1. Review the **Available Skills** list below
+2. If a skill matches your current task, **load it first**
+3. Announce: "I'm using the [skill-name] skill for [purpose]"
+4. Follow the skill's instructions exactly
 
-## How to Load Skills
+## How to Load a Skill
 
-To load a skill, use the `skillforge read` command:
+Run this command to load a skill's full instructions:
 
 ```bash
 skillforge read <skill-name>
 ```
 
-This outputs the skill's instructions, which you should follow for that domain.
+## Important Guidelines
 
-## Announcing Skill Usage
+- **Check skills first** - Before starting work, check if a skill applies
+- **Load before acting** - Always load the skill content before following it
+- **Follow exactly** - Skill instructions are tested procedures; don't paraphrase
+- **One at a time** - Load and complete one skill before starting another
 
-When using a skill, announce it:
-- "I'm using the [skill-name] skill to [purpose]"
-- This helps maintain transparency about your approach
+## Common Mistakes to Avoid
+
+- Assuming you know what a skill contains without loading it
+- Skipping skills because the task "seems simple"
+- Paraphrasing skill instructions instead of following them
+- Not announcing which skill you're using
 
 ## Available Skills
 
-Skills are configured in the project's `.skillforge.yaml` file. Use `skillforge list` to see available skills.
+{available_skills}
 
 ---
-
-*This is a placeholder meta-skill. Full implementation will include skill discovery and progressive loading instructions.*
+*To load any skill, use:* `skillforge read <skill-name>`

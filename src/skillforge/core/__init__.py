@@ -3,6 +3,11 @@
 from skillforge.core.config import SkillForgeConfig, load_config, find_config_file
 from skillforge.core.skill import Skill
 from skillforge.core.loader import SkillLoader, SkillNotFoundError
+from skillforge.core.meta_skill import (
+    render_meta_skill,
+    format_skills_list,
+    get_meta_skill_content,
+)
 
 __all__ = [
     "SkillForgeConfig",
@@ -11,4 +16,7 @@ __all__ = [
     "Skill",
     "SkillLoader",
     "SkillNotFoundError",
+    "render_meta_skill",
+    "format_skills_list",
+    "get_meta_skill_content",
 ]
