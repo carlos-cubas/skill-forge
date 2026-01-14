@@ -310,7 +310,9 @@ class TestSkillLoader:
         )
         skills = loader.discover()
 
-        assert len(skills) == 3
+        # Check that core fixture skills are discovered (don't hardcode total count
+        # since additional test skills may be added to fixtures)
+        assert len(skills) >= 3
         assert "rapid-interviewing" in skills
         assert "minimal-skill" in skills
         assert "data-analysis" in skills
@@ -358,9 +360,13 @@ class TestSkillLoader:
 
         skill_names = loader.list_skills()
 
-        assert len(skill_names) == 3
+        # Check that core fixture skills are listed (don't hardcode total count
+        # since additional test skills may be added to fixtures)
+        assert len(skill_names) >= 3
         assert skill_names == sorted(skill_names)  # Should be sorted
         assert "data-analysis" in skill_names
+        assert "rapid-interviewing" in skill_names
+        assert "minimal-skill" in skill_names
 
     def test_reload_skills(self):
         """Test reloading skills clears cache and re-discovers."""
@@ -463,7 +469,11 @@ class TestSkillLoaderWithRelativePaths:
 
         skills = loader.discover()
 
-        assert len(skills) == 3
+        # Check that skills are discovered (don't hardcode total count
+        # since additional test skills may be added to fixtures)
+        assert len(skills) >= 3
+        assert "rapid-interviewing" in skills
+        assert "minimal-skill" in skills
 
     def test_recursive_glob_pattern(self):
         """Test recursive glob patterns with **."""

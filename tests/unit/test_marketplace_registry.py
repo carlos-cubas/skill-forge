@@ -173,6 +173,16 @@ class TestParseMarketplaceSource:
         assert name == "owner/repo"
         assert url == "https://github.com/owner/repo.git"
 
+    def test_ssh_git_url(self) -> None:
+        """Test parsing SSH git URL."""
+        source_type, name, url = parse_marketplace_source(
+            "git@github.com:owner/repo.git"
+        )
+
+        assert source_type == MarketplaceSource.GIT_URL
+        assert name == "owner/repo"
+        assert url == "git@github.com:owner/repo.git"
+
     def test_invalid_github_format(self) -> None:
         """Test that invalid github: format raises error."""
         with pytest.raises(ValueError, match="Invalid GitHub source"):
