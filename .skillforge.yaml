@@ -1,0 +1,18 @@
+# SkillForge Configuration
+# See: https://github.com/your-org/skill-forge for documentation
+
+# Glob patterns for discovering skills in your project
+# Skills are directories containing a SKILL.md file
+skill_paths:
+  - ./skills/*                    # Project-level skills
+  # - ./agents/**/skills/*        # Agent-specific skills
+  # - ./shared-skills/*           # Shared skills across agents
+
+# Path to custom meta-skill (optional)
+# If not set, uses the default using-skillforge meta-skill
+# meta_skill: ./my-meta-skill
+
+# Skill loading mode:
+# - "progressive": Load skills on-demand via `skillforge read` (recommended)
+# - "eager": Load all skills into agent prompt at startup
+skill_mode: progressive
