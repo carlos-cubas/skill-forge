@@ -9,6 +9,19 @@ from skillforge.core.meta_skill import (
     get_meta_skill_content,
 )
 from skillforge.core.registry import ToolRegistry
+from skillforge.core.marketplace import (
+    Marketplace,
+    MarketplaceSkill,
+    MarketplaceSource,
+    parse_marketplace_source,
+)
+from skillforge.core.marketplace_registry import (
+    MarketplaceRegistry,
+    MarketplaceNotFoundError,
+    MarketplaceExistsError,
+    SkillNotInMarketplaceError,
+)
+from skillforge.core.fetcher import MarketplaceFetcher, FetchError
 
 __all__ = [
     "SkillForgeConfig",
@@ -21,4 +34,15 @@ __all__ = [
     "format_skills_list",
     "get_meta_skill_content",
     "ToolRegistry",
+    # Marketplace components
+    "Marketplace",
+    "MarketplaceSkill",
+    "MarketplaceSource",
+    "parse_marketplace_source",
+    "MarketplaceRegistry",
+    "MarketplaceNotFoundError",
+    "MarketplaceExistsError",
+    "SkillNotInMarketplaceError",
+    "MarketplaceFetcher",
+    "FetchError",
 ]
