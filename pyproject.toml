@@ -63,6 +63,7 @@ markers = [
     "general_assumption: marks tests as validating general SkillForge assumptions",
     "benchmark: marks tests as performance benchmark tests",
     "requires_api_key: marks tests as requiring an API key",
+    "elevenlabs: marks tests as ElevenLabs integration tests",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
