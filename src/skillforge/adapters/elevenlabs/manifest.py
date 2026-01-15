@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -129,7 +129,7 @@ class ElevenLabsManifest:
         """
         self._documents[skill_name] = {
             "document_id": doc_id,
-            "synced_at": datetime.utcnow().isoformat() + "Z",
+            "synced_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "content_hash": content_hash,
         }
         logger.debug(f"Set document ID for skill '{skill_name}': {doc_id}")
