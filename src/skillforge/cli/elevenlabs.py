@@ -6,14 +6,23 @@ This module provides CLI commands for managing ElevenLabs integration:
 - skillforge elevenlabs sync - Sync skills to Knowledge Base
 - skillforge elevenlabs status - Show sync status
 - skillforge elevenlabs disconnect - Remove stored credentials
+- skillforge elevenlabs create - Create new agent with skills
+- skillforge elevenlabs configure - Configure existing agent with skills
 """
 
+from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
+from skillforge.adapters.elevenlabs.agent import (
+    AgentError,
+    SkillNotSyncedError,
+    create_agent as create_agent_func,
+    configure_agent as configure_agent_func,
+)
 from skillforge.adapters.elevenlabs.credentials import (
     CredentialsNotFoundError,
     InvalidCredentialsError,
@@ -254,3 +263,243 @@ def status() -> None:
 
     console.print(table)
     console.print(f"\n[bold]Total:[/bold] {len(synced_skills)} skill(s) synced")
+
+
+@app.command()
+def create(
+    name: str = typer.Option(
+        ...,
+        "--name",
+        "-n",
+        help="Name for the new agent",
+    ),
+    system_prompt: Path = typer.Option(
+        ...,
+        "--system-prompt",
+        "-p",
+        help="Path to file containing the core system prompt",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+    ),
+    skills: str = typer.Option(
+        ...,
+        "--skills",
+        "-s",
+        help="Comma-separated list of skill names",
+    ),
+    first_message: str = typer.Option(
+        "Hello! How can I help you today?",
+        "--first-message",
+        "-m",
+        help="Initial message the agent sends to users",
+    ),
+    voice_id: Optional[str] = typer.Option(
+        None,
+        "--voice-id",
+        "-v",
+        help="ElevenLabs voice ID (uses default if not specified)",
+    ),
+    language: str = typer.Option(
+        "en",
+        "--language",
+        "-l",
+        help="Agent language code (e.g., 'en', 'es', 'fr')",
+    ),
+    llm: str = typer.Option(
+        "gpt-4o-mini",
+        "--llm",
+        help="LLM model to use (e.g., 'gpt-4o-mini', 'gpt-4o')",
+    ),
+) -> None:
+    """Create a new ElevenLabs agent with skills.
+
+    The agent will be configured with:
+    - Combined prompt: core system prompt + meta-skill + skill directory
+    - Knowledge Base references for each skill (for RAG retrieval)
+
+    Prerequisites:
+    - Run 'skillforge elevenlabs connect' to store credentials
+    - Run 'skillforge elevenlabs sync' to sync skills to KB
+
+    Examples:
+        $ skillforge elevenlabs create \\
+            --name "Math Tutor" \\
+            --system-prompt ./prompts/tutor.md \\
+            --skills socratic-questioning,adaptive-scaffolding \\
+            --first-message "Hi! What math topic shall we explore?"
+
+        $ skillforge elevenlabs create \\
+            --name "Event Coach" \\
+            --system-prompt ./prompts/coach.md \\
+            --skills rapid-interviewing,goal-extraction \\
+            --voice-id "21m00Tcm4TlvDq8ikWAM" \\
+            --language es
+    """
+    # Check credentials
+    try:
+        load_credentials()
+    except CredentialsNotFoundError:
+        import os
+
+        if not os.environ.get("ELEVENLABS_API_KEY"):
+            console.print(
+                "[red]Error:[/red] No credentials found. "
+                "Run 'skillforge elevenlabs connect' or set ELEVENLABS_API_KEY"
+            )
+            raise typer.Exit(1)
+
+    # Parse skill names
+    skill_names = [s.strip() for s in skills.split(",") if s.strip()]
+    if not skill_names:
+        console.print("[red]Error:[/red] No skills specified")
+        raise typer.Exit(1)
+
+    # Read system prompt from file
+    try:
+        core_prompt = system_prompt.read_text(encoding="utf-8")
+    except Exception as e:
+        console.print(f"[red]Error:[/red] Failed to read system prompt file: {e}")
+        raise typer.Exit(1)
+
+    # Create the agent
+    console.print(f"\n[bold]Creating agent '{name}'...[/bold]")
+    console.print(f"  Skills: {', '.join(skill_names)}")
+    console.print(f"  Language: {language}")
+    console.print(f"  LLM: {llm}")
+    if voice_id:
+        console.print(f"  Voice ID: {voice_id}")
+
+    try:
+        agent_id = create_agent_func(
+            name=name,
+            core_prompt=core_prompt,
+            first_message=first_message,
+            skills=skill_names,
+            voice_id=voice_id,
+            language=language,
+            llm=llm,
+        )
+
+        console.print(f"\n[green]Agent created successfully![/green]")
+        console.print(f"  Agent ID: [bold]{agent_id}[/bold]")
+        console.print("\nTo configure this agent later:")
+        console.print(f"  skillforge elevenlabs configure --agent-id {agent_id} ...")
+
+    except SkillNotSyncedError as e:
+        console.print(f"\n[red]Error:[/red] {e}")
+        console.print("\nSync the required skills first:")
+        console.print(f"  skillforge elevenlabs sync --skills {skills}")
+        raise typer.Exit(1)
+
+    except AgentError as e:
+        console.print(f"\n[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+
+
+@app.command()
+def configure(
+    agent_id: str = typer.Option(
+        ...,
+        "--agent-id",
+        "-a",
+        help="ID of the agent to configure",
+    ),
+    skills: str = typer.Option(
+        ...,
+        "--skills",
+        "-s",
+        help="Comma-separated list of skill names",
+    ),
+    system_prompt: Optional[Path] = typer.Option(
+        None,
+        "--system-prompt",
+        "-p",
+        help="Path to file containing new core system prompt (preserves existing if not specified)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+    ),
+) -> None:
+    """Configure an existing ElevenLabs agent with skills.
+
+    Updates the agent's configuration to include:
+    - Combined prompt: core system prompt + meta-skill + skill directory
+    - Knowledge Base references for each skill (for RAG retrieval)
+
+    By default, preserves the agent's existing core prompt (the part before any
+    "---" separator) and only updates the meta-skill and skill directory sections.
+    Use --system-prompt to replace the core prompt entirely.
+
+    Prerequisites:
+    - Run 'skillforge elevenlabs connect' to store credentials
+    - Run 'skillforge elevenlabs sync' to sync skills to KB
+
+    Examples:
+        $ skillforge elevenlabs configure \\
+            --agent-id abc123 \\
+            --skills socratic-questioning,adaptive-scaffolding
+
+        $ skillforge elevenlabs configure \\
+            --agent-id abc123 \\
+            --system-prompt ./prompts/new-tutor.md \\
+            --skills socratic-questioning,adaptive-scaffolding
+    """
+    # Check credentials
+    try:
+        load_credentials()
+    except CredentialsNotFoundError:
+        import os
+
+        if not os.environ.get("ELEVENLABS_API_KEY"):
+            console.print(
+                "[red]Error:[/red] No credentials found. "
+                "Run 'skillforge elevenlabs connect' or set ELEVENLABS_API_KEY"
+            )
+            raise typer.Exit(1)
+
+    # Parse skill names
+    skill_names = [s.strip() for s in skills.split(",") if s.strip()]
+    if not skill_names:
+        console.print("[red]Error:[/red] No skills specified")
+        raise typer.Exit(1)
+
+    # Read new system prompt if provided
+    core_prompt = None
+    if system_prompt:
+        try:
+            core_prompt = system_prompt.read_text(encoding="utf-8")
+        except Exception as e:
+            console.print(f"[red]Error:[/red] Failed to read system prompt file: {e}")
+            raise typer.Exit(1)
+
+    # Configure the agent
+    console.print(f"\n[bold]Configuring agent {agent_id}...[/bold]")
+    console.print(f"  Skills: {', '.join(skill_names)}")
+    if system_prompt:
+        console.print(f"  System prompt: {system_prompt}")
+    else:
+        console.print("  System prompt: [dim](preserving existing)[/dim]")
+
+    try:
+        configure_agent_func(
+            agent_id=agent_id,
+            skills=skill_names,
+            core_prompt=core_prompt,
+            preserve_prompt=True,
+        )
+
+        console.print(f"\n[green]Agent configured successfully![/green]")
+        console.print(f"  Skills equipped: {', '.join(skill_names)}")
+
+    except SkillNotSyncedError as e:
+        console.print(f"\n[red]Error:[/red] {e}")
+        console.print("\nSync the required skills first:")
+        console.print(f"  skillforge elevenlabs sync --skills {skills}")
+        raise typer.Exit(1)
+
+    except AgentError as e:
+        console.print(f"\n[red]Error:[/red] {e}")
+        raise typer.Exit(1)

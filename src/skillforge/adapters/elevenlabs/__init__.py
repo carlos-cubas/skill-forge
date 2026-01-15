@@ -22,6 +22,14 @@ from skillforge.adapters.elevenlabs.sync import (
     delete_skill_from_kb,
     SyncError,
 )
+from skillforge.adapters.elevenlabs.agent import (
+    create_agent,
+    configure_agent,
+    build_prompt,
+    get_kb_references,
+    AgentError,
+    SkillNotSyncedError,
+)
 
 __all__ = [
     # Meta-skill rendering
@@ -44,4 +52,11 @@ __all__ = [
     "sync_skills_to_kb",
     "delete_skill_from_kb",
     "SyncError",
+    # Agent operations
+    "create_agent",
+    "configure_agent",
+    "build_prompt",
+    "get_kb_references",
+    "AgentError",
+    "SkillNotSyncedError",
 ]
