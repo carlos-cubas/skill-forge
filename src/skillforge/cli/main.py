@@ -8,12 +8,14 @@ This module provides the main CLI entry point for SkillForge commands:
 - skillforge uninstall - Uninstall skills
 - skillforge list - List installed skills
 - skillforge read - Load skill content for agents
+- skillforge elevenlabs - ElevenLabs integration commands
 """
 
 import typer
 from rich.console import Console
 
 from skillforge.cli import marketplace
+from skillforge.cli import elevenlabs
 from skillforge.cli.read import read_skill
 from skillforge.cli.install import install
 from skillforge.cli.uninstall import uninstall
@@ -41,6 +43,9 @@ app.command(name="list")(list_skills)
 
 # Register marketplace subcommands
 app.add_typer(marketplace.app, name="marketplace")
+
+# Register elevenlabs subcommands
+app.add_typer(elevenlabs.app, name="elevenlabs")
 
 
 @app.command()
