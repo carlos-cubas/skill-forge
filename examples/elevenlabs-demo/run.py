@@ -296,7 +296,7 @@ def validate_skills_synced(report: ValidationReport, mock_api: bool = True) -> b
             doc_id = doc_ids.get(skill_name, "N/A")
             if is_synced and doc_id:
                 # Show truncated doc ID
-                display_id = doc_id[:20] + "..." if len(doc_id) > 20 else doc_id
+                display_id = str(doc_id)[:20] + "..." if len(str(doc_id)) > 20 else doc_id
                 cp.add_detail(f"  - {skill_name}: {status} (doc_id={display_id})")
             else:
                 cp.add_detail(f"  - {skill_name}: {status}")
@@ -334,35 +334,30 @@ def validate_manifest_documents(
 
         # In real mode, verify document IDs are real (not mock IDs)
         has_mock_ids = False
-        has_real_ids = False
 
         for skill_name, doc_id in doc_ids.items():
             if doc_id:
                 # Truncate long doc IDs for display
-                display_id = doc_id[:20] + "..." if len(doc_id) > 20 else doc_id
+                display_id = str(doc_id)[:20] + "..." if len(str(doc_id)) > 20 else doc_id
 
                 # Check if this is a mock or real ID
-                is_mock_id = doc_id.startswith("doc_mock_")
+                is_mock_id = str(doc_id).startswith("doc_mock_")
                 if is_mock_id:
                     has_mock_ids = True
                     cp.add_detail(f"  - {skill_name}: {display_id} (mock)")
                 else:
-                    has_real_ids = True
                     cp.add_detail(f"  - {skill_name}: {display_id} (real)")
             else:
                 cp.add_detail(f"  - {skill_name}: NO DOCUMENT ID")
 
         if mock_api:
             cp.add_detail("Mode: mock (simulated manifest)")
-            # In mock mode, all IDs should be mock IDs
-            ids_valid = all_have_ids and has_mock_ids and not has_real_ids
         else:
             cp.add_detail("Mode: real (from .skillforge/elevenlabs-manifest.json)")
             # In real mode, all IDs should be real (not mock)
             if has_mock_ids:
                 cp.add_detail("WARNING: Found mock document IDs in real mode!")
                 cp.add_detail("  Run `sync_skills_to_elevenlabs(mock_api=False)` to sync")
-            ids_valid = all_have_ids and has_real_ids and not has_mock_ids
 
         if not mock_api and has_mock_ids:
             cp.check(False, "Found mock document IDs in real mode - sync required")
@@ -585,14 +580,6 @@ def validate_agent_configured(report: ValidationReport, mock_api: bool = True) -
         kb_refs_updated = len(updated_agent.kb_references) == len(new_skills)
         prompt_updated = updated_agent.system_prompt != initial_agent.system_prompt
 
-        # Verify the removed skills are not in new prompt
-        removed_skills = set(initial_skills) - set(new_skills)
-        removed_skills_absent = all(
-            skill not in updated_agent.system_prompt
-            or f"SKILL: {skill}" not in updated_agent.system_prompt
-            for skill in removed_skills
-        )
-
         cp.add_detail(f"Initial skills: {initial_skills}")
         cp.add_detail(f"New skills: {updated_agent.skills}")
         cp.add_detail(f"Initial KB refs: {initial_kb_refs}")
@@ -660,7 +647,6 @@ def validate_kb_references(report: ValidationReport, mock_api: bool = True) -> b
         # Validate structure of each KB reference
         all_valid = True
         has_mock_ids = False
-        has_real_ids = False
 
         for ref in kb_refs:
             has_type = ref.get("type") == "text"
@@ -681,7 +667,6 @@ def validate_kb_references(report: ValidationReport, mock_api: bool = True) -> b
                 has_mock_ids = True
                 id_type = "mock"
             else:
-                has_real_ids = True
                 id_type = "real"
 
             status = "valid" if ref_valid else "INVALID"

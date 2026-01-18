@@ -39,6 +39,9 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# Demo directory (for resolving skills path)
+DEMO_DIR = Path(__file__).parent
+
 # Base system prompt for voice customer support agent
 BASE_VOICE_PROMPT = """You are a friendly and professional voice customer support agent for a software company.
 
@@ -276,6 +279,76 @@ def _get_kb_references_for_skills(
     return references
 
 
+def sync_skills_to_elevenlabs(
+    skills: list[str],
+    mock_api: bool = True,
+    force: bool = False,
+) -> tuple[Any, dict[str, str]]:
+    """Sync skills to ElevenLabs Knowledge Base.
+
+    This is the key integration point: it ensures skills are uploaded to the KB
+    before agent creation/configuration. Returns a manifest and document ID mapping.
+
+    Args:
+        skills: List of skill names to sync.
+        mock_api: If True, use mock manifest with fake document IDs.
+        force: If True, re-sync even if content hasn't changed.
+
+    Returns:
+        Tuple of (manifest, doc_ids) where:
+        - manifest: ElevenLabsManifest or MockElevenLabsManifest instance
+        - doc_ids: Dictionary mapping skill names to document IDs
+
+    Raises:
+        ImportError: If real mode requested but adapter not available.
+        SyncError: If real sync operation fails.
+
+    Example:
+        >>> manifest, doc_ids = sync_skills_to_elevenlabs(["greeting"], mock_api=True)
+        >>> "greeting" in doc_ids
+        True
+    """
+    if mock_api:
+        # Mock mode: create mock manifest with fake document IDs
+        manifest = _create_mock_manifest(skills)
+        doc_ids = {skill: manifest.get_document_id(skill) for skill in skills}
+        return manifest, doc_ids
+
+    # Real mode: use actual ElevenLabs adapter
+    from skillforge.adapters.elevenlabs import (
+        ElevenLabsManifest,
+        sync_skills_to_kb,
+    )
+    from skillforge.core.loader import SkillLoader
+
+    # Load skills from the demo's skills directory
+    skills_dir = DEMO_DIR / "skills"
+    loader = SkillLoader([str(skills_dir / "*")], base_path=DEMO_DIR)
+    discovered_skills = loader.discover()
+
+    # Filter to only requested skills and validate they exist
+    skills_to_sync: dict[str, Any] = {}
+    missing = []
+    for skill_name in skills:
+        if skill_name in discovered_skills:
+            skills_to_sync[skill_name] = discovered_skills[skill_name]
+        else:
+            missing.append(skill_name)
+
+    if missing:
+        available = ", ".join(sorted(discovered_skills.keys())) or "(none)"
+        raise ValueError(
+            f"Skills not found: {', '.join(missing)}. Available: {available}"
+        )
+
+    # Sync to ElevenLabs KB
+    manifest = ElevenLabsManifest()
+    doc_ids = sync_skills_to_kb(skills_to_sync, manifest, force=force)
+
+    logger.info(f"Synced {len(doc_ids)} skills to ElevenLabs KB")
+    return manifest, doc_ids
+
+
 def create_voice_agent(
     name: str = "Voice Support Agent",
     core_prompt: str = BASE_VOICE_PROMPT,
@@ -283,11 +356,17 @@ def create_voice_agent(
     skills: Optional[list[str]] = None,
     voice_id: Optional[str] = None,
     mock_api: bool = True,
+    force_sync: bool = False,
 ) -> CustomerSupportVoiceAgent:
     """Create a voice customer support agent with skills.
 
     Creates an ElevenLabs agent configured with the combined prompt
     (core + meta-skill + skill directory) and KB references for each skill.
+
+    In real mode, this function:
+    1. Syncs skills to ElevenLabs Knowledge Base (via sync_skills_to_elevenlabs)
+    2. Builds the combined prompt with meta-skill instructions
+    3. Creates the agent via ElevenLabs API
 
     Args:
         name: Name for the agent.
@@ -296,6 +375,7 @@ def create_voice_agent(
         skills: List of skill names to equip the agent with.
         voice_id: Optional ElevenLabs voice ID.
         mock_api: If True, skip real API calls and return mock agent.
+        force_sync: If True, re-sync skills even if content unchanged.
 
     Returns:
         A CustomerSupportVoiceAgent wrapper instance.
@@ -323,20 +403,23 @@ def create_voice_agent(
         # Real mode: use actual ElevenLabs adapter
         try:
             from skillforge.adapters.elevenlabs import (
-                ElevenLabsManifest,
                 build_prompt,
                 create_agent as elevenlabs_create_agent,
                 get_kb_references,
             )
 
-            manifest = ElevenLabsManifest()
+            # Step 1: Sync skills to KB first (required before agent creation)
+            manifest, doc_ids = sync_skills_to_elevenlabs(
+                skills, mock_api=False, force=force_sync
+            )
             manifest_path = manifest.manifest_file
+            logger.info(f"Skills synced to KB: {list(doc_ids.keys())}")
 
-            # Build prompt and get KB references
+            # Step 2: Build prompt and get KB references
             system_prompt = build_prompt(core_prompt, skills, manifest)
             kb_references = get_kb_references(skills, manifest)
 
-            # Create the actual agent
+            # Step 3: Create the actual agent via ElevenLabs API
             agent_id = elevenlabs_create_agent(
                 name=name,
                 core_prompt=core_prompt,
@@ -345,6 +428,8 @@ def create_voice_agent(
                 voice_id=voice_id,
                 manifest=manifest,
             )
+            logger.info(f"Created ElevenLabs agent: {agent_id}")
+
         except ImportError as e:
             logger.warning(f"ElevenLabs adapter not available: {e}")
             # Fall back to mock mode
@@ -369,16 +454,23 @@ def configure_voice_agent(
     skills: list[str],
     core_prompt: Optional[str] = None,
     mock_api: bool = True,
+    force_sync: bool = False,
 ) -> CustomerSupportVoiceAgent:
     """Configure an existing voice agent with new skills.
 
     Updates the agent's prompt and KB references with new skills.
+
+    In real mode, this function:
+    1. Syncs new skills to ElevenLabs Knowledge Base (via sync_skills_to_elevenlabs)
+    2. Updates the agent's prompt and KB references via ElevenLabs API
+    3. Returns an updated CustomerSupportVoiceAgent
 
     Args:
         agent: Existing CustomerSupportVoiceAgent to configure.
         skills: New list of skill names to equip the agent with.
         core_prompt: Optional new core prompt. If None, preserves existing.
         mock_api: If True, skip real API calls.
+        force_sync: If True, re-sync skills even if content unchanged.
 
     Returns:
         Updated CustomerSupportVoiceAgent instance.
@@ -417,14 +509,18 @@ def configure_voice_agent(
     # Real mode: use actual ElevenLabs adapter
     try:
         from skillforge.adapters.elevenlabs import (
-            ElevenLabsManifest,
             build_prompt,
             configure_agent as elevenlabs_configure_agent,
             get_kb_references,
         )
 
-        manifest = ElevenLabsManifest()
+        # Step 1: Sync new skills to KB first (required before configuration)
+        manifest, doc_ids = sync_skills_to_elevenlabs(
+            skills, mock_api=False, force=force_sync
+        )
+        logger.info(f"Skills synced to KB for configuration: {list(doc_ids.keys())}")
 
+        # Step 2: Configure the agent via ElevenLabs API
         if agent.agent_id:
             elevenlabs_configure_agent(
                 agent_id=agent.agent_id,
@@ -432,7 +528,9 @@ def configure_voice_agent(
                 core_prompt=core_prompt,
                 manifest=manifest,
             )
+            logger.info(f"Configured ElevenLabs agent: {agent.agent_id}")
 
+        # Step 3: Build prompt and get KB references for local wrapper
         system_prompt = build_prompt(core_prompt, skills, manifest)
         kb_references = get_kb_references(skills, manifest)
 
@@ -641,7 +739,7 @@ def get_manifest_sync_info(mock_api: bool = True) -> dict[str, dict]:
     Example:
         >>> info = get_manifest_sync_info(mock_api=True)
         >>> "document_id" in info.get("greeting", {})
-        False  # Empty if not pre-populated
+        True
     """
     if mock_api:
         manifest = _create_mock_manifest(VOICE_SUPPORT_SKILLS)
@@ -805,13 +903,11 @@ def main() -> None:
         doc_ids = verify_manifest_has_documents(VOICE_SUPPORT_SKILLS, mock_api=True)
         print("Document IDs in manifest:")
 
-        all_have_ids = True
         for skill, doc_id in doc_ids.items():
             has_id = doc_id is not None
             status = "[PASS]" if has_id else "[FAIL]"
             print(f"  {status} {skill}: {doc_id}")
             if not has_id:
-                all_have_ids = False
                 all_passed = False
 
         synced = verify_skills_synced(VOICE_SUPPORT_SKILLS, mock_api=True)
