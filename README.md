@@ -1,5 +1,7 @@
 # SkillForge
 
+[![Example Validation](https://github.com/carlos-cubas/skill-forge/actions/workflows/examples.yml/badge.svg)](https://github.com/carlos-cubas/skill-forge/actions/workflows/examples.yml)
+
 ## Overview
 
 SkillForge is a Python toolkit that enables CrewAI and LangChain agents to be equipped with domain-specific skills using Anthropic's proven skill format. It is the generalized equivalent of OpenSkills—same format, any domain, targeting multi-agent frameworks.
@@ -222,8 +224,24 @@ pytest tests/test_loader.py -v
 pytest -k test_skill_discovery
 ```
 
+## Examples
+
+See the [`examples/`](examples/) directory for complete working examples:
+
+| Example | Framework | Description |
+|---------|-----------|-------------|
+| [crewai-demo](examples/crewai-demo/) | CrewAI | Multi-agent customer support crew with 3 agents |
+| [langchain-demo](examples/langchain-demo/) | LangChain | Single agent with progressive skill loading |
+| [elevenlabs-demo](examples/elevenlabs-demo/) | ElevenLabs | Voice agent with KB-based skill sync |
+
+```bash
+# Run any demo in CI mode (no API keys needed)
+cd examples/crewai-demo && python run.py --quick
+```
+
 ## Documentation
 
+- [Examples Overview](examples/README.md) - Quick start guide for all examples
 - [Design Document](docs/plans/2025-12-04-skillforge-design.md) - Complete architecture and rationale
 - [ElevenLabs Adapter Design](docs/plans/2026-01-11-elevenlabs-adapter-design.md) - Voice agent integration details
 - [Anthropic: Equipping Agents with Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) - Official skill format spec

@@ -316,4 +316,5 @@ export OPENAI_API_KEY=your-api-key
 ## Related Examples
 
 - `examples/shared-skills/` - Shared skills used by this demo
-- Future: `examples/langchain-demo/` - LangChain integration example
+- `examples/langchain-demo/` - LangChain single-agent integration
+- `examples/elevenlabs-demo/` - ElevenLabs voice agent integration
