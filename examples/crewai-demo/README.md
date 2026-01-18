@@ -210,7 +210,7 @@ Working directory: /path/to/examples/crewai-demo
        Has results: True
 
 ============================================================
-VALIDATION SUMMARY: 12/12 checkpoints passed
+VALIDATION SUMMARY: 13/13 checkpoints passed
 ============================================================
 
 All validations passed!
