@@ -25,6 +25,7 @@ from skillforge.adapters.elevenlabs.sync import (
 from skillforge.adapters.elevenlabs.agent import (
     create_agent,
     configure_agent,
+    delete_agent,
     build_prompt,
     get_kb_references,
     AgentError,
@@ -55,6 +56,7 @@ __all__ = [
     # Agent operations
     "create_agent",
     "configure_agent",
+    "delete_agent",
     "build_prompt",
     "get_kb_references",
     "AgentError",

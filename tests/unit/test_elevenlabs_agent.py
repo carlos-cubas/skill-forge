@@ -20,6 +20,7 @@ from skillforge.adapters.elevenlabs.agent import (
     build_prompt,
     configure_agent,
     create_agent,
+    delete_agent,
     get_kb_references,
 )
 from skillforge.adapters.elevenlabs.manifest import ElevenLabsManifest
@@ -437,6 +438,85 @@ class TestConfigureAgent:
                 skills=["nonexistent-skill"],
                 manifest=manifest,
             )
+
+
+class TestDeleteAgent:
+    """Tests for delete_agent function."""
+
+    @patch("skillforge.adapters.elevenlabs.agent.get_client")
+    def test_delete_agent_success(self, mock_get_client: MagicMock) -> None:
+        """Test successful agent deletion."""
+        mock_client = MagicMock()
+        mock_client.conversational_ai.agents.delete.return_value = None
+        mock_get_client.return_value = mock_client
+
+        result = delete_agent("agent_to_delete")
+
+        assert result is True
+        mock_client.conversational_ai.agents.delete.assert_called_once_with(
+            "agent_to_delete"
+        )
+
+    @patch("skillforge.adapters.elevenlabs.agent.get_client")
+    def test_delete_agent_not_found(self, mock_get_client: MagicMock) -> None:
+        """Test deletion of non-existent agent returns False."""
+        mock_client = MagicMock()
+        mock_client.conversational_ai.agents.delete.side_effect = Exception(
+            "Agent not found"
+        )
+        mock_get_client.return_value = mock_client
+
+        result = delete_agent("nonexistent_agent")
+
+        assert result is False
+        mock_client.conversational_ai.agents.delete.assert_called_once_with(
+            "nonexistent_agent"
+        )
+
+    @patch("skillforge.adapters.elevenlabs.agent.get_client")
+    def test_delete_agent_api_error(self, mock_get_client: MagicMock) -> None:
+        """Test that API errors are handled gracefully."""
+        mock_client = MagicMock()
+        mock_client.conversational_ai.agents.delete.side_effect = Exception(
+            "API rate limit exceeded"
+        )
+        mock_get_client.return_value = mock_client
+
+        result = delete_agent("agent_123")
+
+        assert result is False
+
+    @patch("skillforge.adapters.elevenlabs.agent.logger")
+    @patch("skillforge.adapters.elevenlabs.agent.get_client")
+    def test_delete_agent_logs_success(
+        self, mock_get_client: MagicMock, mock_logger: MagicMock
+    ) -> None:
+        """Test that successful deletion is logged."""
+        mock_client = MagicMock()
+        mock_client.conversational_ai.agents.delete.return_value = None
+        mock_get_client.return_value = mock_client
+
+        delete_agent("agent_xyz")
+
+        mock_logger.info.assert_called_once()
+        assert "agent_xyz" in mock_logger.info.call_args[0][0]
+
+    @patch("skillforge.adapters.elevenlabs.agent.logger")
+    @patch("skillforge.adapters.elevenlabs.agent.get_client")
+    def test_delete_agent_logs_warning_on_failure(
+        self, mock_get_client: MagicMock, mock_logger: MagicMock
+    ) -> None:
+        """Test that failed deletion logs a warning."""
+        mock_client = MagicMock()
+        mock_client.conversational_ai.agents.delete.side_effect = Exception(
+            "Some error"
+        )
+        mock_get_client.return_value = mock_client
+
+        delete_agent("failing_agent")
+
+        mock_logger.warning.assert_called_once()
+        assert "failing_agent" in mock_logger.warning.call_args[0][0]
 
 
 class TestCLICommands:

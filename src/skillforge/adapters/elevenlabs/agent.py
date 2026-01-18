@@ -384,3 +384,22 @@ def configure_agent(
         raise
     except Exception as e:
         raise AgentError(f"Failed to configure agent {agent_id}: {e}") from e
+
+
+def delete_agent(agent_id: str) -> bool:
+    """Delete an ElevenLabs agent.
+
+    Args:
+        agent_id: ID of the agent to delete.
+
+    Returns:
+        True if deleted successfully, False if not found.
+    """
+    client = get_client()
+    try:
+        client.conversational_ai.agents.delete(agent_id)
+        logger.info(f"Deleted agent: {agent_id}")
+        return True
+    except Exception as e:
+        logger.warning(f"Could not delete agent {agent_id}: {e}")
+        return False
