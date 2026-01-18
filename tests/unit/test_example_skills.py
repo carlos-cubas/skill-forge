@@ -33,7 +33,7 @@ def load_function_from_tools_file(tools_path: Path, function_name: str):
 
 
 # Path to example skills
-EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples" / "shared-skills"
+EXAMPLES_DIR = (Path(__file__).parent.parent.parent / "examples" / "shared-skills").resolve()
 
 
 class TestExampleSkillsDiscovery:
@@ -71,7 +71,7 @@ class TestExampleSkillsDiscovery:
 class TestGreetingSkill:
     """Tests for the greeting skill (no tools)."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def skill(self):
         """Load the greeting skill."""
         return parse_skill_md(EXAMPLES_DIR / "greeting")
@@ -106,7 +106,7 @@ class TestGreetingSkill:
 class TestTroubleshootingSkill:
     """Tests for the troubleshooting skill (no tools)."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def skill(self):
         """Load the troubleshooting skill."""
         return parse_skill_md(EXAMPLES_DIR / "troubleshooting")
@@ -134,11 +134,15 @@ class TestTroubleshootingSkill:
         assert "Password Reset Problems" in skill.instructions
         assert "Login/Access Issues" in skill.instructions
 
+    def test_tools_module_path_none(self, skill):
+        """Test troubleshooting skill tools_module_path is None."""
+        assert skill.tools_module_path is None
+
 
 class TestTicketCreationSkill:
     """Tests for the ticket-creation skill (with tools)."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def skill(self):
         """Load the ticket-creation skill."""
         return parse_skill_md(EXAMPLES_DIR / "ticket-creation")
@@ -175,7 +179,7 @@ class TestTicketCreationSkill:
 class TestKnowledgeSearchSkill:
     """Tests for the knowledge-search skill (with tools)."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def skill(self):
         """Load the knowledge-search skill."""
         return parse_skill_md(EXAMPLES_DIR / "knowledge-search")
@@ -300,6 +304,11 @@ class TestCreateTicketTool:
         assert result["ticket_id"] in result["message"]
         assert "high" in result["message"]
 
+    def test_create_ticket_with_empty_title(self, create_ticket):
+        """Test create_ticket handles empty title."""
+        result = create_ticket(title="", description="Test", priority="low")
+        assert result["title"] == ""
+
 
 class TestSearchKbTool:
     """Tests for the search_kb tool function."""
@@ -389,3 +398,8 @@ class TestSearchKbTool:
         # Use a very broad search that might match many articles
         results = search_kb("account security login password email")
         assert len(results) <= 5
+
+    def test_search_kb_with_zero_max_results(self, search_kb):
+        """Test search_kb with max_results=0 returns empty list."""
+        results = search_kb("email", max_results=0)
+        assert results == []
