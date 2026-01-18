@@ -1,0 +1,6 @@
+# CrewAI Demo Requirements
+# Install with: pip install -r requirements.txt
+
+crewai>=0.41.0
+skillforge[crewai]
+python-dotenv>=1.0.0

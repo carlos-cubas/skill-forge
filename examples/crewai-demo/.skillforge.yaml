@@ -1,0 +1,5 @@
+# SkillForge configuration for CrewAI Demo
+# Points to shared skills in the parent directory
+
+skill_paths:
+  - ../shared-skills/*
