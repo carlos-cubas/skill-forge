@@ -183,9 +183,9 @@ def validate_marketplace_install(report: ValidationReport) -> bool:
             import shutil
             shutil.rmtree(install_dir)
 
-        # Install the skill from marketplace
+        # Install the skill from marketplace (use --force to handle stale manifest entries)
         result = subprocess.run(
-            ["skillforge", "install", "greeting@shared-skills", "--to", str(install_dir)],
+            ["skillforge", "install", "greeting@shared-skills", "--to", str(install_dir), "--force"],
             capture_output=True,
             text=True,
         )
