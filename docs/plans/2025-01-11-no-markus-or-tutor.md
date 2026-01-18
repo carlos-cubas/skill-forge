@@ -1,0 +1,1 @@
+Skill-forge is a tool/library; other than the meta-skill it doesn't really have skills. Discussions about Markus agent or Student tutor agent skills were illustrative only and should not be implemented or part of the plan.  If there's a need for some skills to be implemented from a testing standpoint.  We should create some generic example ones.

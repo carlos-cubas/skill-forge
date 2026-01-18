@@ -1,0 +1,8 @@
+/ralph-loop:ralph-loop "consider the design document {design_doc.md}, 1. Answer the 
+question what do I need to do next to bring this design to life? 2. Read existing github issues, make 
+sure you understand how they form a cohesive best in class implementation plan. 3. Create/update any 
+github issues so that they contains task details of what needs to be done and are sequenced 
+appropriately. Success Criteria: Use a sub agent and get their honest opinion on the quality of your 
+github issues plan. If this sub-agent believes this plan is best in class, you are done. Output 
+<promise>COMPLETED</promise> when you meet the success criteria." --max-iterations 30 
+--completion-promise "COMPLETED"
