@@ -257,9 +257,33 @@ def validate_skills_synced(report: ValidationReport, mock_api: bool = True) -> b
     )
 
     try:
-        from agent import VOICE_SUPPORT_SKILLS, verify_skills_synced
+        from agent import VOICE_SUPPORT_SKILLS, sync_skills_to_elevenlabs
 
-        synced = verify_skills_synced(VOICE_SUPPORT_SKILLS, mock_api=mock_api)
+        if mock_api:
+            cp.add_detail("Mode: mock (simulated sync)")
+            # In mock mode, sync returns mock manifest with fake document IDs
+            manifest, doc_ids = sync_skills_to_elevenlabs(
+                VOICE_SUPPORT_SKILLS, mock_api=True
+            )
+            synced = {skill: doc_ids.get(skill) is not None for skill in VOICE_SUPPORT_SKILLS}
+        else:
+            cp.add_detail("Mode: real (ElevenLabs API)")
+            cp.add_detail("Syncing skills to ElevenLabs Knowledge Base...")
+            # In real mode, actually sync skills to ElevenLabs KB
+            try:
+                manifest, doc_ids = sync_skills_to_elevenlabs(
+                    VOICE_SUPPORT_SKILLS, mock_api=False, force=False
+                )
+                synced = {skill: doc_ids.get(skill) is not None for skill in VOICE_SUPPORT_SKILLS}
+                cp.add_detail("Sync completed successfully!")
+            except ImportError as e:
+                cp.check(False, f"ElevenLabs adapter not available: {e}")
+                report.add(cp)
+                return False
+            except Exception as e:
+                cp.check(False, f"Sync failed: {e}")
+                report.add(cp)
+                return False
 
         all_synced = all(synced.values())
         synced_count = sum(1 for v in synced.values() if v)
@@ -269,12 +293,13 @@ def validate_skills_synced(report: ValidationReport, mock_api: bool = True) -> b
 
         for skill_name, is_synced in synced.items():
             status = "synced" if is_synced else "NOT synced"
-            cp.add_detail(f"  - {skill_name}: {status}")
-
-        if mock_api:
-            cp.add_detail("Mode: mock (simulated sync)")
-        else:
-            cp.add_detail("Mode: real (ElevenLabs API)")
+            doc_id = doc_ids.get(skill_name, "N/A")
+            if is_synced and doc_id:
+                # Show truncated doc ID
+                display_id = doc_id[:20] + "..." if len(doc_id) > 20 else doc_id
+                cp.add_detail(f"  - {skill_name}: {status} (doc_id={display_id})")
+            else:
+                cp.add_detail(f"  - {skill_name}: {status}")
 
         cp.check(all_synced, f"Only {synced_count}/{len(synced)} skills synced")
         report.add(cp)
@@ -307,22 +332,45 @@ def validate_manifest_documents(
         cp.add_detail(f"Skills checked: {len(doc_ids)}")
         cp.add_detail(f"Document IDs present: {ids_count}/{len(doc_ids)}")
 
+        # In real mode, verify document IDs are real (not mock IDs)
+        has_mock_ids = False
+        has_real_ids = False
+
         for skill_name, doc_id in doc_ids.items():
             if doc_id:
                 # Truncate long doc IDs for display
                 display_id = doc_id[:20] + "..." if len(doc_id) > 20 else doc_id
-                cp.add_detail(f"  - {skill_name}: {display_id}")
+
+                # Check if this is a mock or real ID
+                is_mock_id = doc_id.startswith("doc_mock_")
+                if is_mock_id:
+                    has_mock_ids = True
+                    cp.add_detail(f"  - {skill_name}: {display_id} (mock)")
+                else:
+                    has_real_ids = True
+                    cp.add_detail(f"  - {skill_name}: {display_id} (real)")
             else:
                 cp.add_detail(f"  - {skill_name}: NO DOCUMENT ID")
 
         if mock_api:
             cp.add_detail("Mode: mock (simulated manifest)")
+            # In mock mode, all IDs should be mock IDs
+            ids_valid = all_have_ids and has_mock_ids and not has_real_ids
         else:
             cp.add_detail("Mode: real (from .skillforge/elevenlabs-manifest.json)")
+            # In real mode, all IDs should be real (not mock)
+            if has_mock_ids:
+                cp.add_detail("WARNING: Found mock document IDs in real mode!")
+                cp.add_detail("  Run `sync_skills_to_elevenlabs(mock_api=False)` to sync")
+            ids_valid = all_have_ids and has_real_ids and not has_mock_ids
 
-        cp.check(all_have_ids, f"Only {ids_count}/{len(doc_ids)} skills have doc IDs")
+        if not mock_api and has_mock_ids:
+            cp.check(False, "Found mock document IDs in real mode - sync required")
+        else:
+            cp.check(all_have_ids, f"Only {ids_count}/{len(doc_ids)} skills have doc IDs")
+
         report.add(cp)
-        return all_have_ids
+        return all_have_ids and (mock_api or not has_mock_ids)
     except Exception as e:
         cp.check(False, str(e))
         report.add(cp)
@@ -341,7 +389,27 @@ def validate_agent_created(report: ValidationReport, mock_api: bool = True) -> b
     try:
         from agent import create_voice_agent
 
-        agent = create_voice_agent(mock_api=mock_api)
+        if mock_api:
+            cp.add_detail("Mode: mock (simulated agent creation)")
+        else:
+            cp.add_detail("Mode: real (ElevenLabs API)")
+            cp.add_detail("Creating agent via ElevenLabs API...")
+
+        # Create agent with force_sync=False (use existing synced skills)
+        try:
+            agent = create_voice_agent(mock_api=mock_api, force_sync=False)
+        except ImportError as e:
+            if not mock_api:
+                cp.check(False, f"ElevenLabs adapter not available: {e}")
+                report.add(cp)
+                return False
+            raise
+        except Exception as e:
+            if not mock_api:
+                cp.check(False, f"Agent creation failed: {e}")
+                report.add(cp)
+                return False
+            raise
 
         has_name = agent.name is not None and len(agent.name) > 0
         has_prompt = agent.system_prompt is not None and len(agent.system_prompt) > 0
@@ -353,13 +421,26 @@ def validate_agent_created(report: ValidationReport, mock_api: bool = True) -> b
         cp.add_detail(f"Agent type: {type(agent).__name__}")
         cp.add_detail(f"Name: {agent.name}")
         cp.add_detail(f"Mock mode: {agent.mock_mode}")
-        cp.add_detail(f"Agent ID: {agent.agent_id or 'None (mock)'}")
+
+        if mock_api:
+            cp.add_detail(f"Agent ID: None (mock mode)")
+        else:
+            cp.add_detail(f"Agent ID: {agent.agent_id or 'None (creation may have failed)'}")
+            if agent.agent_id:
+                cp.add_detail("Agent created successfully on ElevenLabs!")
+
         cp.add_detail(f"System prompt length: {len(agent.system_prompt)} chars")
         cp.add_detail(f"Skills count: {len(agent.skills)}")
         cp.add_detail(f"Skills: {agent.skills}")
+        cp.add_detail(f"KB references: {len(agent.kb_references)}")
         cp.add_detail(f"First message: {agent.first_message[:50]}...")
 
         success = all([has_name, has_prompt, has_skills, has_first_message])
+
+        # In real mode, also verify we have an agent_id or that mock_mode is False
+        if not mock_api and not agent.mock_mode and not agent.agent_id:
+            cp.add_detail("WARNING: Real mode but no agent_id returned")
+
         cp.check(success, "Agent missing required fields")
         report.add(cp)
         return success
@@ -385,7 +466,26 @@ def validate_meta_skill_in_prompt(
     try:
         from agent import create_voice_agent, verify_meta_skill_present
 
-        agent = create_voice_agent(mock_api=mock_api)
+        if mock_api:
+            cp.add_detail("Mode: mock (simulated prompt)")
+        else:
+            cp.add_detail("Mode: real (from ElevenLabs agent)")
+
+        try:
+            agent = create_voice_agent(mock_api=mock_api, force_sync=False)
+        except ImportError as e:
+            if not mock_api:
+                cp.check(False, f"ElevenLabs adapter not available: {e}")
+                report.add(cp)
+                return False
+            raise
+        except Exception as e:
+            if not mock_api:
+                cp.check(False, f"Agent creation failed: {e}")
+                report.add(cp)
+                return False
+            raise
+
         has_meta_skill = verify_meta_skill_present(agent)
 
         # Additional checks for ElevenLabs-specific meta-skill content
@@ -435,16 +535,51 @@ def validate_agent_configured(report: ValidationReport, mock_api: bool = True) -
     try:
         from agent import configure_voice_agent, create_voice_agent
 
+        if mock_api:
+            cp.add_detail("Mode: mock (simulated configuration)")
+        else:
+            cp.add_detail("Mode: real (ElevenLabs API)")
+
         # Create initial agent
-        initial_agent = create_voice_agent(mock_api=mock_api)
+        try:
+            initial_agent = create_voice_agent(mock_api=mock_api, force_sync=False)
+        except ImportError as e:
+            if not mock_api:
+                cp.check(False, f"ElevenLabs adapter not available: {e}")
+                report.add(cp)
+                return False
+            raise
+        except Exception as e:
+            if not mock_api:
+                cp.check(False, f"Initial agent creation failed: {e}")
+                report.add(cp)
+                return False
+            raise
+
         initial_skills = initial_agent.skills.copy()
         initial_kb_refs = len(initial_agent.kb_references)
 
         # Configure with fewer skills
         new_skills = ["greeting", "troubleshooting"]
-        updated_agent = configure_voice_agent(
-            initial_agent, new_skills, mock_api=mock_api
-        )
+        if not mock_api:
+            cp.add_detail("Configuring agent with new skills via ElevenLabs API...")
+
+        try:
+            updated_agent = configure_voice_agent(
+                initial_agent, new_skills, mock_api=mock_api, force_sync=False
+            )
+        except ImportError as e:
+            if not mock_api:
+                cp.check(False, f"ElevenLabs adapter not available: {e}")
+                report.add(cp)
+                return False
+            raise
+        except Exception as e:
+            if not mock_api:
+                cp.check(False, f"Agent configuration failed: {e}")
+                report.add(cp)
+                return False
+            raise
 
         skills_updated = set(updated_agent.skills) == set(new_skills)
         kb_refs_updated = len(updated_agent.kb_references) == len(new_skills)
@@ -465,6 +600,9 @@ def validate_agent_configured(report: ValidationReport, mock_api: bool = True) -
         cp.add_detail(f"Skills updated correctly: {skills_updated}")
         cp.add_detail(f"KB refs updated correctly: {kb_refs_updated}")
         cp.add_detail(f"Prompt changed: {prompt_updated}")
+
+        if not mock_api and updated_agent.agent_id:
+            cp.add_detail("Agent configuration updated on ElevenLabs!")
 
         success = all([skills_updated, kb_refs_updated])
         cp.check(success, "Agent configuration update failed")
@@ -492,7 +630,26 @@ def validate_kb_references(report: ValidationReport, mock_api: bool = True) -> b
             verify_kb_references_match_skills,
         )
 
-        agent = create_voice_agent(mock_api=mock_api)
+        if mock_api:
+            cp.add_detail("Mode: mock (simulated KB references)")
+        else:
+            cp.add_detail("Mode: real (ElevenLabs API)")
+
+        try:
+            agent = create_voice_agent(mock_api=mock_api, force_sync=False)
+        except ImportError as e:
+            if not mock_api:
+                cp.check(False, f"ElevenLabs adapter not available: {e}")
+                report.add(cp)
+                return False
+            raise
+        except Exception as e:
+            if not mock_api:
+                cp.check(False, f"Agent creation failed: {e}")
+                report.add(cp)
+                return False
+            raise
+
         kb_refs = get_kb_references_for_validation(agent)
         refs_match = verify_kb_references_match_skills(agent)
 
@@ -502,6 +659,9 @@ def validate_kb_references(report: ValidationReport, mock_api: bool = True) -> b
 
         # Validate structure of each KB reference
         all_valid = True
+        has_mock_ids = False
+        has_real_ids = False
+
         for ref in kb_refs:
             has_type = ref.get("type") == "text"
             has_name = ref.get("name", "").startswith("SKILL:")
@@ -513,18 +673,36 @@ def validate_kb_references(report: ValidationReport, mock_api: bool = True) -> b
                 all_valid = False
 
             skill_name = ref.get("name", "SKILL: unknown").replace("SKILL: ", "")
-            status = "valid" if ref_valid else "INVALID"
-            cp.add_detail(f"  - {skill_name}: {status} (id={ref.get('id', 'N/A')[:15]}...)")
+            doc_id = ref.get("id", "N/A")
 
-        if mock_api:
-            cp.add_detail("Mode: mock (simulated KB references)")
-        else:
-            cp.add_detail("Mode: real (ElevenLabs API verified)")
+            # Check if this is a mock or real ID
+            is_mock_id = isinstance(doc_id, str) and doc_id.startswith("doc_mock_")
+            if is_mock_id:
+                has_mock_ids = True
+                id_type = "mock"
+            else:
+                has_real_ids = True
+                id_type = "real"
+
+            status = "valid" if ref_valid else "INVALID"
+            display_id = doc_id[:15] + "..." if len(str(doc_id)) > 15 else doc_id
+            cp.add_detail(f"  - {skill_name}: {status} (id={display_id}, {id_type})")
+
+        # In real mode, warn if mock IDs are found
+        if not mock_api and has_mock_ids:
+            cp.add_detail("WARNING: Found mock document IDs in real mode!")
+            cp.add_detail("  Skills may not be properly synced to ElevenLabs KB")
 
         success = refs_match and all_valid and len(kb_refs) == len(agent.skills)
-        cp.check(success, "KB references do not match configured skills")
+
+        # In real mode, also require real IDs (not mock)
+        if not mock_api and has_mock_ids:
+            cp.check(False, "KB references contain mock IDs - sync required")
+        else:
+            cp.check(success, "KB references do not match configured skills")
+
         report.add(cp)
-        return success
+        return success and (mock_api or not has_mock_ids)
     except Exception as e:
         cp.check(False, str(e))
         report.add(cp)
@@ -606,6 +784,16 @@ def run_real_validation(report: ValidationReport) -> None:
         print("       Running quick validation instead...\n")
         run_quick_validation(report)
         return
+
+    # Inform user about what will happen
+    masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
+    print(f"Using API key: {masked_key}")
+    print("This validation will:")
+    print("  - Sync skills to ElevenLabs Knowledge Base")
+    print("  - Create a test agent on ElevenLabs")
+    print("  - Configure the agent with different skills")
+    print("  - Verify KB references match synced documents")
+    print("")
 
     # Run all 9 checkpoints in real mode
     validate_installation(report)
