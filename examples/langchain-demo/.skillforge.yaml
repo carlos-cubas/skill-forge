@@ -1,0 +1,5 @@
+# SkillForge configuration for LangChain Demo
+# Points to local skills directory (symlinks to shared-skills)
+
+skill_paths:
+  - ./skills/*
