@@ -627,9 +627,8 @@ def cleanup(
                 raise typer.Exit(1)
         else:
             # Dry run - just list what would be deleted
-            console.print(
-                f"[bold]KB documents that would be deleted ({len(matching_skills)}):[/bold]\n"
-            )
+            count = len(matching_skills)
+            console.print(f"[bold]KB documents that would be deleted ({count}):[/bold]\n")
 
             # Create table
             table = Table()
