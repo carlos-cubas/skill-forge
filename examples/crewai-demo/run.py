@@ -171,6 +171,52 @@ def validate_marketplace_add(report: ValidationReport) -> bool:
         return False
 
 
+def validate_marketplace_install(report: ValidationReport) -> bool:
+    """Validate marketplace install CLI command."""
+    cp = ValidationCheckpoint("Marketplace CLI: install greeting@shared-skills")
+
+    install_dir = Path(__file__).parent / "installed-skills"
+
+    try:
+        # Clean up any previous installation
+        if install_dir.exists():
+            import shutil
+            shutil.rmtree(install_dir)
+
+        # Install the skill from marketplace
+        result = subprocess.run(
+            ["skillforge", "install", "greeting@shared-skills", "--to", str(install_dir)],
+            capture_output=True,
+            text=True,
+        )
+
+        success = result.returncode == 0
+        skill_installed = (install_dir / "greeting" / "SKILL.md").exists()
+
+        if success and skill_installed:
+            cp.add_detail("Skill installed successfully")
+            cp.add_detail(f"Installed to: {install_dir / 'greeting'}")
+        else:
+            cp.add_detail(f"returncode: {result.returncode}")
+            cp.add_detail(f"stdout: {result.stdout[:200]}")
+            cp.add_detail(f"stderr: {result.stderr[:200]}")
+            cp.add_detail(f"SKILL.md exists: {skill_installed}")
+
+        overall_success = success and skill_installed
+        cp.check(overall_success, f"Install failed or SKILL.md not found")
+        report.add(cp)
+        return overall_success
+    except Exception as e:
+        cp.check(False, str(e))
+        report.add(cp)
+        return False
+    finally:
+        # Clean up installed skill directory
+        if install_dir.exists():
+            import shutil
+            shutil.rmtree(install_dir)
+
+
 def validate_marketplace_list(report: ValidationReport) -> bool:
     """Validate marketplace list CLI command shows skills."""
     cp = ValidationCheckpoint("Marketplace CLI: list shows shared-skills")
@@ -545,6 +591,7 @@ def run_quick_validation(report: ValidationReport) -> None:
     # Run all validations
     validate_installation(report)
     validate_marketplace_add(report)
+    validate_marketplace_install(report)
     validate_marketplace_list(report)
     validate_skill_list(report)
     validate_crew_creation(report)
@@ -607,6 +654,7 @@ def run_real_validation(report: ValidationReport) -> None:
     # Run quick validations first
     validate_installation(report)
     validate_marketplace_add(report)
+    validate_marketplace_install(report)
     validate_marketplace_list(report)
     validate_skill_list(report)
     validate_crew_creation(report)
