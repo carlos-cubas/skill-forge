@@ -1,0 +1,84 @@
+name: Example Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quick-validation:
+    name: Quick Validation (Mocked APIs)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -e ".[all,dev]"
+
+      - name: Validate CrewAI Demo (quick)
+        run: cd examples/crewai-demo && python run.py --quick
+
+      - name: Validate LangChain Demo (quick)
+        run: cd examples/langchain-demo && python run.py --quick
+
+      - name: Validate ElevenLabs Demo (quick)
+        run: cd examples/elevenlabs-demo && python run.py --quick
+
+  real-api-validation:
+    name: Real API Validation
+    runs-on: ubuntu-latest
+    # Only run on main branch pushes (requires API secrets)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -e ".[all,dev]"
+
+      - name: Validate CrewAI Demo (real)
+        continue-on-error: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: cd examples/crewai-demo && python run.py --real
+
+      - name: Validate LangChain Demo (real)
+        continue-on-error: true
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: cd examples/langchain-demo && python run.py --real
+
+      - name: Validate ElevenLabs Demo (real)
+        continue-on-error: true
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: cd examples/elevenlabs-demo && python run.py --real
