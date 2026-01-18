@@ -70,6 +70,22 @@ All demos support `--quick` mode for CI/CD pipelines:
 python run.py --quick
 ```
 
+### GitHub Actions Setup
+
+For real API validation in CI (main branch only), configure these repository secrets:
+
+| Secret | Required By | How to Get |
+|--------|------------|------------|
+| `OPENAI_API_KEY` | CrewAI, LangChain demos | [OpenAI Platform](https://platform.openai.com/api-keys) |
+| `ELEVENLABS_API_KEY` | ElevenLabs demo | [ElevenLabs Profile](https://elevenlabs.io/app/settings/api-keys) |
+
+To configure secrets:
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Add each secret with its API key value
+
+The CI workflow runs `--quick` mode on all PRs, and `--real` mode on main branch pushes when secrets are configured.
+
 **Quick mode features:**
 - Mocked LLM/API calls (no API keys required)
 - Full validation checkpoint execution
