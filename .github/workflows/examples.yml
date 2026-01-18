@@ -66,19 +66,44 @@ jobs:
         run: pip install -e ".[all,dev]"
 
       - name: Validate CrewAI Demo (real)
+        id: crewai
         continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: cd examples/crewai-demo && python run.py --real
 
       - name: Validate LangChain Demo (real)
+        id: langchain
         continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: cd examples/langchain-demo && python run.py --real
 
       - name: Validate ElevenLabs Demo (real)
+        id: elevenlabs
         continue-on-error: true
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
         run: cd examples/elevenlabs-demo && python run.py --real
+
+      - name: Report validation status
+        if: always()
+        run: |
+          echo "## Real API Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Demo | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CrewAI | ${{ steps.crewai.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| LangChain | ${{ steps.langchain.outcome }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ElevenLabs | ${{ steps.elevenlabs.outcome }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Enforce validation success
+        if: always()
+        run: |
+          if [ "${{ steps.crewai.outcome }}" != "success" ] || \
+             [ "${{ steps.langchain.outcome }}" != "success" ] || \
+             [ "${{ steps.elevenlabs.outcome }}" != "success" ]; then
+            echo "::error::Real API validation failed - see summary above"
+            exit 1
+          fi
+          echo "All real API validations passed!"
