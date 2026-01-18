@@ -345,6 +345,14 @@ def sync_skills_to_elevenlabs(
     manifest = ElevenLabsManifest()
     doc_ids = sync_skills_to_kb(skills_to_sync, manifest, force=force)
 
+    # Track documents for cleanup
+    try:
+        from run import _created_resources
+        for skill_name, doc_id in doc_ids.items():
+            _created_resources["documents"].append((skill_name, doc_id))
+    except ImportError:
+        pass  # run.py not imported (direct agent.py usage)
+
     logger.info(f"Synced {len(doc_ids)} skills to ElevenLabs KB")
     return manifest, doc_ids
 
@@ -429,6 +437,13 @@ def create_voice_agent(
                 manifest=manifest,
             )
             logger.info(f"Created ElevenLabs agent: {agent_id}")
+
+            # Track agent for cleanup
+            try:
+                from run import _created_resources
+                _created_resources["agents"].append(agent_id)
+            except ImportError:
+                pass  # run.py not imported (direct agent.py usage)
 
         except ImportError as e:
             logger.warning(f"ElevenLabs adapter not available: {e}")

@@ -14,10 +14,12 @@ a series of checkpoints that verify:
 7. System prompt includes ElevenLabs meta-skill
 8. Agent configured via CLI (update skills)
 9. KB references verified via API
+10. Cleanup test resources (real mode only)
 
 Usage:
-    python run.py --quick    # Mocked API calls for CI (default)
-    python run.py --real     # Actual API calls (requires ELEVENLABS_API_KEY)
+    python run.py --quick       # Mocked API calls for CI (default)
+    python run.py --real        # Actual API calls (requires ELEVENLABS_API_KEY)
+    python run.py --real --no-cleanup  # Keep resources for inspection
 
 Requirements:
     - skillforge[elevenlabs] installed
@@ -30,6 +32,12 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+
+# Track resources created during real validation for cleanup
+_created_resources: dict[str, list] = {
+    "agents": [],      # List of agent_ids
+    "documents": [],   # List of (skill_name, doc_id) tuples
+}
 
 
 @dataclass
@@ -736,6 +744,47 @@ def validate_real_api_connection(report: ValidationReport) -> bool:
 
 
 # =============================================================================
+# Checkpoint 10: Cleanup test resources
+# =============================================================================
+
+
+def cleanup_elevenlabs_resources(report: ValidationReport) -> None:
+    """Checkpoint 10: Clean up test resources from ElevenLabs."""
+    cp = ValidationCheckpoint("Checkpoint 10: Cleanup test resources")
+
+    deleted_agents = 0
+    deleted_docs = 0
+
+    try:
+        from skillforge.adapters.elevenlabs import (
+            delete_agent,
+            delete_skill_from_kb,
+            ElevenLabsManifest,
+        )
+
+        # Delete agents
+        for agent_id in _created_resources["agents"]:
+            if delete_agent(agent_id):
+                deleted_agents += 1
+                cp.add_detail(f"Deleted agent: {agent_id}")
+
+        # Delete KB documents
+        manifest = ElevenLabsManifest()
+        for skill_name, doc_id in _created_resources["documents"]:
+            if delete_skill_from_kb(skill_name, manifest):
+                deleted_docs += 1
+                cp.add_detail(f"Deleted document: {skill_name}")
+    except ImportError as e:
+        cp.add_detail(f"Cleanup skipped: adapter not available ({e})")
+    except Exception as e:
+        cp.add_detail(f"Cleanup error: {e}")
+
+    cp.add_detail(f"Summary: deleted {deleted_agents} agents, {deleted_docs} documents")
+    cp.check(True)  # Cleanup always "passes" - best effort
+    report.add(cp)
+
+
+# =============================================================================
 # Main Validation Functions
 # =============================================================================
 
@@ -756,8 +805,13 @@ def run_quick_validation(report: ValidationReport) -> None:
     validate_kb_references(report, mock_api=True)
 
 
-def run_real_validation(report: ValidationReport) -> None:
-    """Run real validation with actual ElevenLabs API calls."""
+def run_real_validation(report: ValidationReport, no_cleanup: bool = False) -> None:
+    """Run real validation with actual ElevenLabs API calls.
+
+    Args:
+        report: ValidationReport to add checkpoints to.
+        no_cleanup: If True, skip cleanup to allow resource inspection.
+    """
     print("\n=== Running REAL validation (with ElevenLabs API) ===\n")
 
     # Check for API key first
@@ -778,6 +832,8 @@ def run_real_validation(report: ValidationReport) -> None:
     print("  - Create a test agent on ElevenLabs")
     print("  - Configure the agent with different skills")
     print("  - Verify KB references match synced documents")
+    if not no_cleanup:
+        print("  - Clean up test resources after validation")
     print("")
 
     # Run all 9 checkpoints in real mode
@@ -793,6 +849,13 @@ def run_real_validation(report: ValidationReport) -> None:
 
     # Run additional real API connection test
     validate_real_api_connection(report)
+
+    # Cleanup test resources (unless --no-cleanup flag)
+    if not no_cleanup:
+        cleanup_elevenlabs_resources(report)
+    else:
+        print("\n[INFO] Skipping cleanup (--no-cleanup flag set)")
+        print("       Resources remain in ElevenLabs for inspection")
 
 
 def main() -> int:
@@ -810,6 +873,11 @@ def main() -> int:
         action="store_true",
         help="Run real validation with actual ElevenLabs API calls",
     )
+    parser.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Skip cleanup to inspect test resources in ElevenLabs dashboard",
+    )
     args = parser.parse_args()
 
     # Default to quick mode
@@ -825,7 +893,7 @@ def main() -> int:
 
     # Run validation
     if args.real:
-        run_real_validation(report)
+        run_real_validation(report, no_cleanup=args.no_cleanup)
     else:
         run_quick_validation(report)
 
