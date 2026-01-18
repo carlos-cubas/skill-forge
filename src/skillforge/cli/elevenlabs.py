@@ -8,8 +8,10 @@ This module provides CLI commands for managing ElevenLabs integration:
 - skillforge elevenlabs disconnect - Remove stored credentials
 - skillforge elevenlabs create - Create new agent with skills
 - skillforge elevenlabs configure - Configure existing agent with skills
+- skillforge elevenlabs cleanup - Clean up ElevenLabs resources
 """
 
+import fnmatch
 from pathlib import Path
 from typing import Optional
 
@@ -34,6 +36,7 @@ from skillforge.adapters.elevenlabs.credentials import (
 from skillforge.adapters.elevenlabs.manifest import ElevenLabsManifest
 from skillforge.adapters.elevenlabs.sync import (
     SyncError,
+    delete_skill_from_kb,
     sync_skill_to_kb,
     sync_skills_to_kb,
 )
@@ -503,3 +506,144 @@ def configure(
     except AgentError as e:
         console.print(f"\n[red]Error:[/red] {e}")
         raise typer.Exit(1)
+
+
+@app.command()
+def cleanup(
+    agents: bool = typer.Option(
+        False,
+        "--agents",
+        help="List/delete agents from ElevenLabs",
+    ),
+    documents: bool = typer.Option(
+        False,
+        "--documents",
+        help="List/delete KB documents from manifest",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Actually delete (default: dry-run)",
+    ),
+    pattern: str = typer.Option(
+        "",
+        "--pattern",
+        help="Filter by name pattern (e.g., 'test*')",
+    ),
+) -> None:
+    """Clean up ElevenLabs resources created by SkillForge.
+
+    Without --force, shows what would be deleted (dry run).
+
+    Examples:
+        $ skillforge elevenlabs cleanup --agents              # List all agents
+        $ skillforge elevenlabs cleanup --documents           # List KB documents
+        $ skillforge elevenlabs cleanup --agents --force      # Delete all agents
+        $ skillforge elevenlabs cleanup --documents --force   # Delete KB documents
+    """
+    # If neither --agents nor --documents specified, show usage help
+    if not agents and not documents:
+        console.print("[yellow]Specify what to clean up:[/yellow]")
+        console.print("  --agents     List/delete agents")
+        console.print("  --documents  List/delete KB documents")
+        console.print("\nExamples:")
+        console.print("  skillforge elevenlabs cleanup --documents")
+        console.print("  skillforge elevenlabs cleanup --documents --force")
+        console.print("  skillforge elevenlabs cleanup --documents --pattern 'test*'")
+        raise typer.Exit(0)
+
+    # Handle agents cleanup
+    if agents:
+        if force:
+            console.print(
+                "[yellow]Agent cleanup requires agent ID.[/yellow]\n"
+                "SkillForge does not currently track agent IDs globally.\n\n"
+                "To delete agents manually:\n"
+                "  1. Use the ElevenLabs dashboard: https://elevenlabs.io/app/conversational-ai\n"
+                "  2. Or use the API with the agent ID directly\n\n"
+                "Future enhancement: Track created agents for bulk cleanup."
+            )
+        else:
+            console.print(
+                "[bold]Agent listing not available[/bold]\n\n"
+                "The ElevenLabs SDK does not provide a simple list agents API.\n"
+                "To view your agents:\n"
+                "  1. Visit: https://elevenlabs.io/app/conversational-ai\n"
+                "  2. Or use the ElevenLabs API directly\n\n"
+                "To delete a specific agent, use the ElevenLabs dashboard or API."
+            )
+        return
+
+    # Handle documents cleanup
+    if documents:
+        manifest = ElevenLabsManifest()
+        synced_skills = manifest.list_synced_skills()
+
+        if not synced_skills:
+            console.print("[yellow]No KB documents found in manifest[/yellow]")
+            console.print("Nothing to clean up.")
+            return
+
+        # Filter by pattern if provided
+        if pattern:
+            matching_skills = [
+                name for name in synced_skills if fnmatch.fnmatch(name, pattern)
+            ]
+            if not matching_skills:
+                console.print(
+                    f"[yellow]No documents matching pattern '{pattern}'[/yellow]"
+                )
+                return
+        else:
+            matching_skills = synced_skills
+
+        if force:
+            # Actually delete documents
+            console.print(
+                f"[bold]Deleting {len(matching_skills)} KB document(s)...[/bold]\n"
+            )
+
+            deleted = 0
+            errors = []
+
+            for skill_name in matching_skills:
+                try:
+                    success = delete_skill_from_kb(skill_name, manifest)
+                    if success:
+                        console.print(f"  [green]-[/green] {skill_name}")
+                        deleted += 1
+                    else:
+                        console.print(f"  [yellow]?[/yellow] {skill_name} (not found)")
+                except Exception as e:
+                    console.print(f"  [red]x[/red] {skill_name}: {e}")
+                    errors.append(skill_name)
+
+            # Summary
+            console.print()
+            if deleted > 0:
+                console.print(f"[green]Deleted {deleted} document(s)[/green]")
+            if errors:
+                console.print(f"[red]Failed to delete {len(errors)} document(s)[/red]")
+                raise typer.Exit(1)
+        else:
+            # Dry run - just list what would be deleted
+            console.print(
+                f"[bold]KB documents that would be deleted ({len(matching_skills)}):[/bold]\n"
+            )
+
+            # Create table
+            table = Table()
+            table.add_column("Skill", style="cyan")
+            table.add_column("Document ID", style="dim")
+            table.add_column("Synced At", style="green")
+
+            for skill_name in matching_skills:
+                info = manifest.get_sync_info(skill_name)
+                if info:
+                    doc_id = info.get("document_id", "")
+                    synced_at = info.get("synced_at", "")
+                    display_id = doc_id[:20] + "..." if len(doc_id) > 20 else doc_id
+                    table.add_row(skill_name, display_id, synced_at)
+
+            console.print(table)
+            console.print("\n[dim]Use --force to actually delete these documents[/dim]")

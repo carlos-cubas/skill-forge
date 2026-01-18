@@ -567,8 +567,8 @@ class TestElevenLabsCLI:
         from skillforge.cli.elevenlabs import app
 
         # Check that the app has commands registered
-        # Commands: connect, disconnect, sync, status, create, configure
-        assert len(app.registered_commands) == 6
+        # Commands: connect, disconnect, sync, status, create, configure, cleanup
+        assert len(app.registered_commands) == 7
 
 
 class TestCLIMainIntegration:
