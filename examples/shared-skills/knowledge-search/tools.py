@@ -1,7 +1,5 @@
 """Knowledge base search tools for support skill."""
 
-from typing import Optional
-
 
 # Mock knowledge base data
 _KNOWLEDGE_BASE = {
@@ -160,25 +158,3 @@ def search_kb(query: str, max_results: int = 5) -> list[dict]:
     results.sort(key=lambda x: x["relevance_score"], reverse=True)
 
     return results[:max_results]
-
-
-def get_article(article_id: str) -> Optional[dict]:
-    """
-    Retrieve a specific article by ID.
-
-    Args:
-        article_id: The knowledge base article ID (e.g., "KB-1001")
-
-    Returns:
-        Article dict with full details, or None if not found
-    """
-    for category, articles in _KNOWLEDGE_BASE.items():
-        for article in articles:
-            if article["id"] == article_id:
-                return {
-                    "id": article["id"],
-                    "title": article["title"],
-                    "summary": article["summary"],
-                    "category": category,
-                }
-    return None
