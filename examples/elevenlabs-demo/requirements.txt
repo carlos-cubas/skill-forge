@@ -1,0 +1,6 @@
+# ElevenLabs Demo Requirements
+# Install with: pip install -r requirements.txt
+
+elevenlabs>=1.0.0
+skillforge[elevenlabs]
+python-dotenv>=1.0.0
